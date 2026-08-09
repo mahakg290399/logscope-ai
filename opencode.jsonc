@@ -1,0 +1,11 @@
+{
+  "mcp": {
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "D:\\code\\log_tool\\.agent-memory\\memory.json"
+      }
+    }
+  }
+}
