@@ -1,0 +1,7 @@
+2026-08-10 14:05:01.000 [ERROR] payment-api: NullPointerException while processing charge for customer_id=8831
+   at com.payment.service.Processor.execute(Processor.java:142)
+   at com.payment.service.PaymentHandler.handle(PaymentHandler.java:55)
+   at org.springframework.web.servlet.DispatcherServlet.doDispatch(DispatcherServlet.java:1064)
+   Caused by: java.lang.IllegalStateException: Gateway transaction client not initialized
+   at com.payment.gateway.StripeClient.connect(StripeClient.java:88)
+2026-08-10 14:05:03.000 [INFO] payment-api: Fallback route invoked for customer_id=8831

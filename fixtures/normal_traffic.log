@@ -1,0 +1,5 @@
+2026-08-10 14:00:01.120 [INFO] auth-service: User login successful for account_id=10049 from IP 192.168.1.50
+2026-08-10 14:00:02.340 [INFO] auth-service: User login successful for account_id=10050 from IP 192.168.1.51
+2026-08-10 14:00:03.560 [INFO] auth-service: Token refreshed for session_id=sess_83912a
+2026-08-10 14:00:04.780 [INFO] auth-service: Healthcheck endpoint /health returned HTTP 200 OK (1ms)
+2026-08-10 14:00:05.900 [DEBUG] auth-service: Cache hit for permission matrix role=admin

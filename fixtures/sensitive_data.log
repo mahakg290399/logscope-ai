@@ -1,0 +1,3 @@
+2026-08-10 14:15:00.000 [INFO] auth-service: Reset password email sent to user.name+test@company.com with token Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-x
+2026-08-10 14:15:01.000 [DEBUG] auth-service: Client connected from 10.240.12.89 with api_key="sk_live_992144881234abcd"
+2026-08-10 14:15:02.000 [INFO] payment-api: Storing payment method card_number=4532-1234-5678-9010 for user_uuid=c38e9d1a-4d2b-4231-9fa1-bc794827d091

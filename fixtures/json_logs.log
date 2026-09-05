@@ -1,0 +1,3 @@
+{"timestamp": "2026-08-10T14:10:00.000Z", "level": "INFO", "service": "order-service", "message": "Order created successfully", "order_id": "ord_9901", "amount": 149.99}
+{"timestamp": "2026-08-10T14:10:01.000Z", "level": "WARN", "service": "order-service", "message": "Inventory lock delayed for sku_3301 duration_ms=420"}
+{"timestamp": "2026-08-10T14:10:02.000Z", "level": "ERROR", "service": "order-service", "message": "Payment gateway timeout after 5000ms", "order_id": "ord_9902"}

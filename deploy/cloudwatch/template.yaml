@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: LogScope AI - AWS CloudWatch Log Forwarder Lambda
+
+Parameters:
+  LogScopeEndpoint:
+    Type: String
+    Description: URL of the LogScope HTTP Ingestion Endpoint (e.g. https://logscope.internal/api/logs/ingest)
+    Default: "http://logscope.internal:8000/api/logs/ingest"
+  LogScopeApiKey:
+    Type: String
+    Description: Optional Bearer token or API key for LogScope
+    NoEcho: true
+    Default: ""
+  EnvironmentName:
+    Type: String
+    Description: Deployment environment tag (e.g. production, staging)
+    Default: "production"
+
+Resources:
+  LogScopeForwarderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: LogScopeCloudWatchForwarder
+      Handler: lambda_function.lambda_handler
+      Runtime: python3.11
+      MemorySize: 256
+      Timeout: 30
+      Environment:
+        Variables:
+          LOGSCOPE_ENDPOINT: !Ref LogScopeEndpoint
+          LOGSCOPE_API_KEY: !Ref LogScopeApiKey
+          LOGSCOPE_ENV: !Ref EnvironmentName
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+Outputs:
+  ForwarderFunctionArn:
+    Description: Lambda Function ARN to use in CloudWatch Logs Subscription Filters
+    Value: !GetAtt LogScopeForwarderFunction.Arn

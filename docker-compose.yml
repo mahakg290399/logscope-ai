@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  # Local Apache Kafka with KRaft (no ZooKeeper required)
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: logscope-kafka
+    ports:
+      - "127.0.0.1:9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      KAFKA_LOG_RETENTION_HOURS: 24
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # LogScope AI Application
+  logscope:
+    build: .
+    container_name: logscope-app
+    ports:
+      - "127.0.0.1:8000:8000"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      - LOGSCOPE_ENV=production
+      - LOGSCOPE_PORT=8000
+      - LOGSCOPE_HOST=0.0.0.0
+      - LOGSCOPE_KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - LOGSCOPE_KAFKA_EMBEDDED_FALLBACK=false
+      - LOGSCOPE_DB_PATH=/app/data/logscope.db
+      - LOGSCOPE_DATA_DIR=/app/data
+      - LOGSCOPE_AI_PROVIDER=${LOGSCOPE_AI_PROVIDER:-nvidia}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_BASE_URL=${NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      - NVIDIA_MODEL=${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}
+      - NVIDIA_EMBEDDING_MODEL=${NVIDIA_EMBEDDING_MODEL:-nvidia/llama-3.2-nv-embedqa-1b-v1}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - LOGSCOPE_SAMPLE_RETENTION_HOURS=${LOGSCOPE_SAMPLE_RETENTION_HOURS:-24}
+      - LOGSCOPE_AGGREGATE_RETENTION_MONTHS=${LOGSCOPE_AGGREGATE_RETENTION_MONTHS:-6}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Persistent database storage
+      - logscope_data:/app/data
+      # Read-only host logs mount
+      - ./logs:/app/logs:ro
+      - ./sources.yaml:/app/sources.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # Optional Fluent Bit Node Agent (Interface 1)
+  fluent-bit:
+    image: fluent/fluent-bit:3.0
+    container_name: logscope-fluent-bit
+    profiles: ["collector", "all"]
+    ports:
+      - "127.0.0.1:2020:2020"
+    depends_on:
+      logscope:
+        condition: service_healthy
+    environment:
+      - LOGSCOPE_HOST=logscope
+      - LOGSCOPE_PORT=8000
+      - LOGSCOPE_ENV=production
+      - LOGSCOPE_APP_NAME=docker-node
+    volumes:
+      - ./deploy/fluent-bit/fluent-bit.conf:/fluent-bit/etc/fluent-bit.conf:ro
+      - ./deploy/fluent-bit/parsers.conf:/fluent-bit/etc/parsers.conf:ro
+      - ./logs:/app/logs:ro
+      - fluent_bit_data:/fluent-bit/data
+    restart: unless-stopped
+
+volumes:
+  kafka_data:
+  logscope_data:
+  fluent_bit_data:
+

@@ -1,0 +1,97 @@
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: logscope-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      KAFKA_LOG_RETENTION_HOURS: 24
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:29092 --list >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+
+  logscope:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    container_name: logscope-app
+    expose:
+      - "8000"
+    env_file:
+      - ../../secrets/.env.runtime
+    environment:
+      LOGSCOPE_DB_PATH: /app/data/logscope.db
+      LOGSCOPE_DATA_DIR: /app/data
+      LOGSCOPE_SOURCES_CONFIG: /app/sources.yaml
+      LOGSCOPE_AI_PROVIDER: ${LOGSCOPE_AI_PROVIDER:-nvidia}
+      NVIDIA_MODEL: ${NVIDIA_MODEL:-nvidia/nemotron-3.5-lightning-30b-a3b}
+      NVIDIA_EMBEDDING_MODEL: ${NVIDIA_EMBEDDING_MODEL:-nvidia/llama-3.2-nv-embedqa-1b-v1}
+      LOGSCOPE_SAMPLE_RETENTION_HOURS: ${LOGSCOPE_SAMPLE_RETENTION_HOURS:-24}
+      LOGSCOPE_AGGREGATE_RETENTION_MONTHS: ${LOGSCOPE_AGGREGATE_RETENTION_MONTHS:-6}
+    depends_on:
+      kafka:
+        condition: service_healthy
+      demo-app:
+        condition: service_started
+    volumes:
+      - logscope_data:/app/data
+      - demo_logs:/app/logs:ro
+      - ./sources.production.yaml:/app/sources.yaml:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/health >/dev/null"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+
+  demo-app:
+    build:
+      context: ../..
+      dockerfile: deploy/demo/Dockerfile
+    container_name: logscope-demo-app
+    volumes:
+      - demo_logs:/var/log/demo
+    environment:
+      DEMO_LOG_DIR: /var/log/demo
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: logscope-caddy
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      LOGSCOPE_DOMAIN: ${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN to a DNS name}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      logscope:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  kafka_data:
+  logscope_data:
+  demo_logs:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,4 @@
+{$LOGSCOPE_DOMAIN} {
+    reverse_proxy logscope:8000
+    encode gzip
+}

@@ -1,11 +1,19 @@
 {
+  "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "env": {
+    "log_tool": {
+      "type": "local",
+      "command": [
+        "cmd",
+        "/c",
+        "npx",
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "environment": {
         "MEMORY_FILE_PATH": "D:\\code\\log_tool\\.agent-memory\\memory.json"
-      }
+      },
+      "enabled": true
     }
   }
 }

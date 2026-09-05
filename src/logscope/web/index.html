@@ -1,0 +1,1133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LogScope AI — Enterprise SRE Platform</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
+            sev0: '#ef4444',
+            sev1: '#f97316',
+            sev2: '#f59e0b',
+            sev3: '#3b82f6',
+            sev4: '#64748b'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body { background-color: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
+    .glass-card:hover { border-color: rgba(255, 255, 255, 0.15); }
+    .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-indigo-500 selection:text-white">
+
+  <!-- Top Navbar -->
+  <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-wave-pulse text-white text-lg"></i>
+        </div>
+        <div>
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">LogScope AI</span>
+          <span class="text-xs px-2 py-0.5 ml-2 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 font-mono">POC v2.0</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-4 text-sm">
+        <div id="connectionStatus" class="flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-950/60 text-emerald-400 border border-emerald-800 text-xs">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-dot"></span>
+          <span>Live Stream</span>
+        </div>
+        <div class="text-xs text-slate-400 font-mono">WAL SQLite &bull; Sanitized Kafka</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Warning Banner (Data Loss / OpenAI Errors) -->
+  <div id="warningBanner" class="hidden bg-amber-950/80 border-b border-amber-800/80 text-amber-200 px-4 py-2 text-sm flex items-center justify-between">
+    <div class="flex items-center gap-2 max-w-7xl mx-auto w-full">
+      <i class="fa-solid fa-triangle-exclamation text-amber-400"></i>
+      <span id="warningText">Warning: High load detected. Some events were dropped via backpressure.</span>
+    </div>
+  </div>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- KPI Metric Cards Row -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      
+      <!-- Ingestion Rate -->
+      <div class="glass-card rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs uppercase tracking-wider font-semibold">
+          <span>Ingestion Rate</span>
+          <i class="fa-solid fa-gauge text-slate-500 text-sm"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="metricIngestRate" class="text-2xl font-bold font-mono text-white">0</span>
+          <span class="text-xs text-slate-400">lines/sec</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">Total lines: <span id="metricTotalLines" class="font-mono text-slate-200">0</span></div>
+      </div>
+
+      <!-- Kafka Stream Lag -->
+      <div class="glass-card rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs uppercase tracking-wider font-semibold">
+          <span>Buffer Lag & Drops</span>
+          <i class="fa-solid fa-layer-group text-slate-500 text-sm"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="metricLag" class="text-2xl font-bold font-mono text-indigo-400">0</span>
+          <span class="text-xs text-slate-400">queued</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">Dropped: <span id="metricDropped" class="font-mono text-amber-400">0</span></div>
+      </div>
+
+      <!-- Active Anomalies -->
+      <div class="glass-card rounded-xl p-4 flex flex-col justify-between">
+        <div class="flex items-center justify-between text-slate-400 text-xs uppercase tracking-wider font-semibold">
+          <span>Active Anomalies</span>
+          <i class="fa-solid fa-triangle-exclamation text-slate-500 text-sm"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="metricAnomalies" class="text-2xl font-bold font-mono text-amber-400">0</span>
+          <span class="text-xs text-slate-400">triaged</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">5-min window spikes & new patterns</div>
+      </div>
+
+      <!-- Mined Templates -->
+      <button type="button" onclick="openTemplatesModal()" aria-label="View mined templates"
+        class="glass-card rounded-xl p-4 flex flex-col justify-between text-left cursor-pointer transition hover:-translate-y-0.5 hover:bg-slate-800/80 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+        <div class="flex items-center justify-between text-slate-400 text-xs uppercase tracking-wider font-semibold">
+          <span>Drain3 Clusters</span>
+          <i class="fa-solid fa-diagram-project text-slate-500 text-sm"></i>
+        </div>
+        <div class="mt-3 flex items-baseline gap-2">
+          <span id="metricTemplates" class="text-2xl font-bold font-mono text-emerald-400">0</span>
+          <span class="text-xs text-slate-400">unique templates</span>
+        </div>
+        <div class="mt-2 text-xs text-slate-400">Sources: <span id="metricSources" class="font-mono text-slate-200">0</span> active</div>
+        <span class="mt-2 text-[11px] text-emerald-400">Click to view template patterns</span>
+      </button>
+
+    </div>
+
+    <!-- 5-Minute Bucket Traffic & Anomaly Timeline Card (Phase 5) -->
+    <div class="glass-card rounded-xl p-5 space-y-3">
+      <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400 text-sm">
+            <i class="fa-solid fa-chart-column"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold text-slate-100">5-Minute Ingestion Volume & Anomaly Timeline</h3>
+            <p class="text-[11px] text-slate-400">Aggregated cluster observation volumes and error spikes across active 5-minute rollups.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-4 text-xs font-mono">
+          <span class="flex items-center gap-1.5 text-indigo-300">
+            <span class="w-3 h-3 rounded bg-indigo-500/40 border border-indigo-400 inline-block"></span> Total Observations
+          </span>
+          <span class="flex items-center gap-1.5 text-rose-300">
+            <span class="w-3 h-3 rounded bg-rose-500/40 border border-rose-400 inline-block"></span> Error Spikes
+          </span>
+          <button onclick="loadTimelineData()" class="text-slate-400 hover:text-slate-200 text-xs px-2 py-1 rounded bg-slate-800 transition">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+      </div>
+      <div class="relative h-44 w-full">
+        <canvas id="timelineChart"></canvas>
+      </div>
+    </div>
+
+    <!-- 2-Column Main Layout: Anomalies Feed & Assistant / Sources -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Left Column: Active Anomalies & Incident Triage (2 Cols) -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <h2 class="text-lg font-semibold tracking-tight text-white">Active Anomalies</h2>
+            <span id="anomaliesBadge" class="px-2 py-0.5 text-xs rounded-full bg-amber-950 text-amber-400 border border-amber-800 font-mono">0</span>
+          </div>
+          <button onclick="refreshData()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5">
+            <i class="fa-solid fa-rotate text-slate-400"></i> Refresh
+          </button>
+        </div>
+
+        <!-- Incident Filtering Controls (Phase 5) -->
+        <div class="glass-card rounded-xl p-3.5 grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <label class="text-[11px] text-slate-400 uppercase tracking-wide">Severity
+            <select id="severityFilter" onchange="applyAnomalyFilters()" class="mt-1 w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <option value="">All severities</option>
+              <option value="Sev-0">Sev-0 Critical</option>
+              <option value="Sev-1">Sev-1 Major</option>
+              <option value="Sev-2">Sev-2 Moderate</option>
+              <option value="Sev-3">Sev-3 Minor</option>
+              <option value="Sev-4">Sev-4 Info</option>
+            </select>
+          </label>
+          <label class="text-[11px] text-slate-400 uppercase tracking-wide">Application / Service
+            <select id="serviceFilter" onchange="applyAnomalyFilters()" class="mt-1 w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <option value="">All applications</option>
+            </select>
+          </label>
+          <label class="text-[11px] text-slate-400 uppercase tracking-wide">Environment
+            <select id="environmentFilter" onchange="applyAnomalyFilters()" class="mt-1 w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <option value="">All environments</option>
+            </select>
+          </label>
+          <label class="text-[11px] text-slate-400 uppercase tracking-wide">Server / Source
+            <select id="serverFilter" onchange="applyAnomalyFilters()" class="mt-1 w-full rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none">
+              <option value="">All sources</option>
+            </select>
+          </label>
+        </div>
+
+        <!-- Anomaly Cards List -->
+        <div id="anomaliesList" class="space-y-4">
+          <!-- Empty State -->
+          <div class="glass-card rounded-xl p-8 text-center text-slate-400 space-y-3">
+            <i class="fa-solid fa-circle-check text-emerald-400 text-3xl"></i>
+            <h3 class="text-base font-medium text-slate-200">All Services Operating Normally</h3>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">No active frequency spikes, error bursts, or unhandled log templates detected across monitored applications.</p>
+          </div>
+        </div>
+
+        <!-- Dismissed Anomalies Section -->
+        <div class="pt-4 border-t border-slate-800">
+          <details class="group">
+            <summary class="flex items-center justify-between cursor-pointer list-none text-sm text-slate-400 hover:text-slate-200 transition">
+              <span class="flex items-center gap-2">
+                <i class="fa-solid fa-chevron-right text-xs transition group-open:rotate-90"></i>
+                <span>Dismissed Anomalies Archive (<span id="dismissedCount">0</span>)</span>
+              </span>
+              <span class="text-xs text-slate-500 font-mono">Historical Record</span>
+            </summary>
+            <div id="dismissedList" class="mt-4 space-y-3 pl-4 border-l border-slate-800">
+              <p class="text-xs text-slate-500">No dismissed anomalies recorded yet.</p>
+            </div>
+          </details>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Ask AI Assistant & Sources (1 Col) -->
+      <div class="space-y-6">
+
+        <!-- Ask AI Card -->
+        <div class="glass-card rounded-xl p-4 flex flex-col space-y-3">
+          <div class="flex items-center gap-2 text-sm font-semibold text-indigo-300">
+            <i class="fa-solid fa-sparkles text-indigo-400"></i>
+            <span>Ask SRE Copilot</span>
+          </div>
+          <p class="text-xs text-slate-400">Query log heartbeat, correlations, or root causes across active and historical templates.</p>
+          
+          <div class="relative">
+            <textarea id="aiQueryInput" rows="3" placeholder="e.g., Why did auth-service spike in errors? Any connection timeouts?" 
+              class="w-full bg-slate-900/90 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"></textarea>
+            <button onclick="askAI()" id="btnAskAI" class="mt-2 w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 shadow shadow-indigo-600/30">
+              <i class="fa-solid fa-paper-plane text-xs"></i> Ask Copilot
+            </button>
+          </div>
+
+          <!-- AI Response Box -->
+          <div id="aiResponseBox" class="hidden mt-2 p-3 rounded-lg bg-slate-900/80 border border-slate-700 text-xs text-slate-300 space-y-2">
+            <div class="font-semibold text-indigo-400 flex items-center gap-1.5">
+              <i class="fa-solid fa-robot"></i> Copilot Analysis:
+            </div>
+            <div id="aiResponseText" class="leading-relaxed whitespace-pre-wrap"></div>
+          </div>
+        </div>
+
+        <!-- Configured Sources Status Card -->
+        <div class="glass-card rounded-xl p-4 space-y-3">
+          <div class="flex items-center justify-between text-sm font-semibold text-slate-200">
+            <div class="flex items-center gap-2">
+              <i class="fa-solid fa-server text-slate-400"></i>
+              <span>Monitored Sources</span>
+            </div>
+            <span class="text-xs text-slate-500 font-mono">Read-Only</span>
+          </div>
+
+          <div id="sourcesList" class="space-y-2 text-xs">
+            <div class="text-slate-500">Loading sources...</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- Dismiss / Resolution Modal -->
+  <div id="dismissModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-xl max-w-lg w-full p-5 space-y-4 bg-slate-900 border border-slate-700 shadow-2xl">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-clipboard-check text-emerald-400"></i> Incident Action & Resolution
+        </h3>
+        <button onclick="closeDismissModal()" class="text-slate-400 hover:text-slate-200 text-sm">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <p class="text-xs text-slate-400">Select an outcome for this anomaly. Documented fixes are indexed into persistent LLM memory to advise on future incidents.</p>
+      
+      <input type="hidden" id="dismissAnomalyId">
+      <input type="hidden" id="dismissAction" value="resolved">
+
+      <!-- Action Selectors -->
+      <div class="grid grid-cols-3 gap-2">
+        <button type="button" onclick="selectDismissAction('resolved')" id="actionBtnResolved"
+          class="p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-emerald-950/50 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500">
+          <div class="font-semibold text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-check-circle text-emerald-400"></i> Resolved
+          </div>
+          <div class="text-[10px] text-emerald-400/80 mt-1">Save fix to LLM memory</div>
+        </button>
+        <button type="button" onclick="selectDismissAction('false_positive')" id="actionBtnFalsePositive"
+          class="p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-slate-800/60 border-slate-700 text-slate-400 hover:border-amber-500/50">
+          <div class="font-semibold text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-shield-halved text-amber-400"></i> False Alarm
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">Expected / harmless test</div>
+        </button>
+        <button type="button" onclick="selectDismissAction('transient')" id="actionBtnTransient"
+          class="p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-slate-800/60 border-slate-700 text-slate-400 hover:border-blue-500/50">
+          <div class="font-semibold text-xs flex items-center gap-1.5">
+            <i class="fa-solid fa-wave-square text-blue-400"></i> Transient
+          </div>
+          <div class="text-[10px] text-slate-500 mt-1">Temporary spike / blip</div>
+        </button>
+      </div>
+
+      <div>
+        <label id="dismissCommentLabel" class="text-xs text-slate-300 font-medium block mb-1">
+          Remediation Steps & Fix Notes <span class="text-emerald-400 text-[11px]">(Indexed for AI Triage)</span>
+        </label>
+        <textarea id="dismissComment" rows="3" placeholder="e.g., Scaled connection pool to 50; rotated expired token; verified health checks."
+          class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-emerald-500 font-mono"></textarea>
+      </div>
+
+      <div class="flex justify-end gap-2 pt-1">
+        <button onclick="closeDismissModal()" class="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs">Cancel</button>
+        <button id="dismissSubmitBtn" onclick="confirmDismiss()" class="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition shadow-lg shadow-emerald-900/30">
+          <i class="fa-solid fa-check mr-1"></i> Confirm Resolution
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mined Templates Modal -->
+  <div id="templatesModal" class="hidden fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-xl max-w-4xl w-full max-h-[85vh] p-5 space-y-4 bg-slate-900 border border-slate-700 shadow-2xl flex flex-col">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-semibold text-white flex items-center gap-2">
+          <i class="fa-solid fa-diagram-project text-emerald-400"></i> Mined Templates
+        </h3>
+        <button type="button" onclick="closeTemplatesModal()" aria-label="Close templates"
+          class="text-slate-400 hover:text-white text-lg">&times;</button>
+      </div>
+      <p class="text-xs text-slate-400">Drain3 patterns ordered by total observations. Click any template to inspect bucket timeline and sample evidence.</p>
+      <div id="templatesList" class="overflow-y-auto space-y-3 pr-1">
+        <p class="text-xs text-slate-500">No templates detected yet.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Template Drill-Down Modal (Phase 5) -->
+  <div id="templateDetailModal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="glass-card rounded-xl max-w-4xl w-full max-h-[88vh] p-6 space-y-4 bg-slate-900 border border-slate-700 shadow-2xl flex flex-col">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-lg bg-indigo-950 border border-indigo-800 flex items-center justify-center text-indigo-400">
+            <i class="fa-solid fa-code"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-semibold text-white">Template Drill-Down & Evidence Inspection</h3>
+            <p id="drillDownSubtitle" class="text-xs text-slate-400 font-mono"></p>
+          </div>
+        </div>
+        <button type="button" onclick="closeTemplateDetailModal()" class="text-slate-400 hover:text-white text-2xl leading-none">&times;</button>
+      </div>
+
+      <div id="drillDownContent" class="overflow-y-auto space-y-4 pr-1 text-xs">
+        <div class="text-slate-400 flex items-center gap-2">
+          <i class="fa-solid fa-spinner fa-spin"></i> Loading template details...
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global State
+    let activeAnomalies = [];
+    let dismissedAnomalies = [];
+    let allActiveAnomalies = [];
+    let allDismissedAnomalies = [];
+    const openDiagnosticIds = new Set();
+    let minedTemplates = [];
+    let timelineChartInstance = null;
+
+    // Severity styling helper
+    function getSeverityBadge(sev) {
+      switch(sev) {
+        case 'Sev-0': return '<span class="px-2 py-0.5 text-xs font-bold rounded bg-red-950 text-red-400 border border-red-800">Sev-0 Critical</span>';
+        case 'Sev-1': return '<span class="px-2 py-0.5 text-xs font-bold rounded bg-orange-950 text-orange-400 border border-orange-800">Sev-1 Major</span>';
+        case 'Sev-2': return '<span class="px-2 py-0.5 text-xs font-bold rounded bg-amber-950 text-amber-400 border border-amber-800">Sev-2 Moderate</span>';
+        case 'Sev-3': return '<span class="px-2 py-0.5 text-xs font-bold rounded bg-blue-950 text-blue-400 border border-blue-800">Sev-3 Minor</span>';
+        case 'Sev-4': return '<span class="px-2 py-0.5 text-xs font-bold rounded bg-slate-800 text-slate-300 border border-slate-700">Sev-4 Info</span>';
+        default: return `<span class="px-2 py-0.5 text-xs font-bold rounded bg-slate-800 text-slate-400">${sev || 'Triaging...'}</span>`;
+      }
+    }
+
+    function getConfidenceBadge(conf) {
+      const colors = {
+        'very-high': 'text-emerald-400 bg-emerald-950 border-emerald-800',
+        'high': 'text-teal-400 bg-teal-950 border-teal-800',
+        'medium': 'text-blue-400 bg-blue-950 border-blue-800',
+        'low': 'text-slate-400 bg-slate-800 border-slate-700',
+        'very-low': 'text-slate-500 bg-slate-900 border-slate-800'
+      };
+      const cls = colors[conf] || 'text-slate-400 bg-slate-800 border-slate-700';
+      return `<span class="px-1.5 py-0.5 text-[10px] rounded border ${cls} uppercase font-mono">${conf || 'eval'}</span>`;
+    }
+
+    function formatDetectedAt(value) {
+      if (!value) return 'Detection time unavailable';
+      const date = new Date(value);
+      return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
+    }
+
+    function anomalySources(anomaly) {
+      return Array.isArray(anomaly.source_paths) ? anomaly.source_paths.filter(Boolean) : [];
+    }
+
+    function updateFilterOptions() {
+      const all = [...allActiveAnomalies, ...allDismissedAnomalies];
+      const services = [...new Set(all.map(a => a.application).filter(Boolean))].sort();
+      const environments = [...new Set(all.map(a => a.environment).filter(Boolean))].sort();
+      const servers = [...new Set(all.flatMap(anomalySources))].sort();
+
+      const update = (id, values, emptyLabel) => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        const current = select.value;
+        select.innerHTML = `<option value="">${emptyLabel}</option>` + values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join('');
+        if (values.includes(current)) select.value = current;
+      };
+
+      update('serviceFilter', services, 'All applications');
+      update('environmentFilter', environments, 'All environments');
+      update('serverFilter', servers, 'All sources');
+    }
+
+    function matchesAnomalyFilters(anomaly) {
+      const severity = document.getElementById('severityFilter')?.value || '';
+      const service = document.getElementById('serviceFilter')?.value || '';
+      const env = document.getElementById('environmentFilter')?.value || '';
+      const server = document.getElementById('serverFilter')?.value || '';
+
+      if (severity && anomaly.severity !== severity) return false;
+      if (service && anomaly.application !== service) return false;
+      if (env && anomaly.environment !== env) return false;
+      if (server && !anomalySources(anomaly).includes(server)) return false;
+      return true;
+    }
+
+    function applyAnomalyFilters() {
+      activeAnomalies = allActiveAnomalies.filter(matchesAnomalyFilters);
+      dismissedAnomalies = allDismissedAnomalies.filter(matchesAnomalyFilters);
+      renderActiveAnomalies(activeAnomalies);
+      renderDismissed(dismissedAnomalies);
+    }
+
+    function renderTemplates(templates) {
+      minedTemplates = Array.isArray(templates) ? templates : [];
+      const container = document.getElementById('templatesList');
+      if (!container) return;
+      if (minedTemplates.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500">No templates detected yet.</p>';
+        return;
+      }
+      container.innerHTML = minedTemplates.map((t, index) => `
+        <article class="rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2 hover:border-indigo-700/60 transition cursor-pointer" onclick="openTemplateDetailModal('${escapeHtml(t.id)}')">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2 text-xs">
+              <span class="font-mono text-emerald-400">#${index + 1}</span>
+              <span class="font-semibold text-slate-200">${escapeHtml(t.application || 'unknown')}</span>
+              <span class="text-slate-500">${escapeHtml(t.environment || '')}</span>
+              <span class="font-mono text-[10px] text-slate-500">[${escapeHtml(t.id)}]</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-xs font-mono text-indigo-300 font-semibold">${Number(t.total_count || 0).toLocaleString()} observations</span>
+              <span class="text-[11px] text-indigo-400 font-medium px-2 py-0.5 rounded bg-indigo-950 border border-indigo-800">Inspect &rarr;</span>
+            </div>
+          </div>
+          <div class="rounded bg-slate-900 p-2 font-mono text-[11px] leading-relaxed text-slate-300 break-words">${escapeHtml(t.template_pattern || '')}</div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-[11px] text-slate-500">
+            <div>First seen: <span class="text-slate-300">${escapeHtml(formatDetectedAt(t.first_seen))}</span></div>
+            <div>Last seen: <span class="text-slate-300">${escapeHtml(formatDetectedAt(t.last_seen))}</span></div>
+          </div>
+        </article>
+      `).join('');
+    }
+
+    async function openTemplatesModal() {
+      document.getElementById('templatesModal').classList.remove('hidden');
+      try {
+        const response = await fetch('/api/templates?limit=100');
+        if (response.ok) renderTemplates(await response.json());
+      } catch (e) {
+        console.error('Template list error:', e);
+      }
+    }
+
+    function closeTemplatesModal() {
+      document.getElementById('templatesModal').classList.add('hidden');
+    }
+
+    // Template Drill-Down Modal (Phase 5)
+    async function openTemplateDetailModal(templateId) {
+      const modal = document.getElementById('templateDetailModal');
+      const subtitle = document.getElementById('drillDownSubtitle');
+      const content = document.getElementById('drillDownContent');
+      modal.classList.remove('hidden');
+      subtitle.innerText = `Template ID: ${templateId}`;
+      content.innerHTML = '<div class="text-slate-400 flex items-center gap-2 py-8 justify-center"><i class="fa-solid fa-spinner fa-spin text-lg text-indigo-400"></i> Loading template telemetry & samples...</div>';
+
+      try {
+        const res = await fetch(`/api/templates/${encodeURIComponent(templateId)}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const tmpl = data.template || {};
+        const history = data.history || [];
+        const samples = data.samples || [];
+
+        content.innerHTML = `
+          <!-- Pattern Box -->
+          <div class="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span class="font-semibold text-slate-300">DRAIN3 TEMPLATE PATTERN</span>
+              <span>${Number(tmpl.total_count || 0).toLocaleString()} total occurrences</span>
+            </div>
+            <div class="font-mono text-xs text-indigo-200 bg-slate-900/90 p-2.5 rounded border border-slate-800/80 break-words leading-relaxed">
+              ${escapeHtml(tmpl.template_pattern || '')}
+            </div>
+            <div class="flex flex-wrap items-center gap-3 pt-1 text-[11px] text-slate-400">
+              <div>App: <span class="text-indigo-400 font-mono font-semibold">${escapeHtml(tmpl.application || '')}</span></div>
+              <div>Env: <span class="text-slate-300 font-mono">${escapeHtml(tmpl.environment || '')}</span></div>
+              <div>First Seen: <span class="text-slate-300 font-mono">${escapeHtml(formatDetectedAt(tmpl.first_seen))}</span></div>
+              <div>Last Seen: <span class="text-slate-300 font-mono">${escapeHtml(formatDetectedAt(tmpl.last_seen))}</span></div>
+            </div>
+          </div>
+
+          <!-- Founding Sample Message -->
+          ${tmpl.sample_message ? `
+          <div class="p-3 rounded-lg bg-slate-950 border border-indigo-900/40 space-y-1.5">
+            <div class="flex items-center justify-between text-[11px] text-slate-400 font-mono">
+              <span class="font-semibold text-indigo-300 flex items-center gap-1.5">
+                <i class="fa-solid fa-file-lines text-indigo-400"></i> Founding Sample Record (Creation Context)
+              </span>
+              <span class="text-[10px] text-slate-500">Real sanitized runtime values</span>
+            </div>
+            <div class="font-mono text-xs text-slate-200 bg-slate-900 p-2.5 rounded border border-slate-800 break-all leading-relaxed">
+              ${escapeHtml(tmpl.sample_message)}
+            </div>
+          </div>
+          ` : ''}
+
+          <!-- 5-Minute Bucket Rollup History Table -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="font-semibold text-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-clock-rotate-left text-indigo-400"></i> Recent 5-Minute Bucket Frequency
+              </h4>
+              <span class="text-[11px] text-slate-500 font-mono">${history.length} buckets</span>
+            </div>
+            ${history.length === 0 ? '<p class="text-slate-500 italic">No bucket records found.</p>' : `
+              <div class="overflow-x-auto rounded-lg border border-slate-800">
+                <table class="w-full text-left font-mono text-[11px]">
+                  <thead class="bg-slate-950 text-slate-400 uppercase text-[10px]">
+                    <tr>
+                      <th class="p-2">Bucket Window Start</th>
+                      <th class="p-2">Bucket Window End</th>
+                      <th class="p-2 text-right">Volume</th>
+                      <th class="p-2 text-right">Errors</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-slate-800 bg-slate-900/60">
+                    ${history.map(b => `
+                      <tr class="hover:bg-slate-800/40">
+                        <td class="p-2 text-slate-300">${escapeHtml(formatDetectedAt(b.bucket_start))}</td>
+                        <td class="p-2 text-slate-400">${escapeHtml(formatDetectedAt(b.bucket_end))}</td>
+                        <td class="p-2 text-right font-bold text-indigo-300">${b.count}</td>
+                        <td class="p-2 text-right font-bold ${b.error_count > 0 ? 'text-rose-400' : 'text-slate-500'}">${b.error_count}</td>
+                      </tr>
+                    `).join('')}
+                  </tbody>
+                </table>
+              </div>
+            `}
+          </div>
+
+          <!-- Sanitized Evidence Samples -->
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <h4 class="font-semibold text-slate-200 flex items-center gap-1.5">
+                <i class="fa-solid fa-shield-halved text-emerald-400"></i> Sanitized Sample Evidence (24-Hour Bounded Retention)
+              </h4>
+              <span class="text-[11px] text-slate-500 font-mono">${samples.length} samples</span>
+            </div>
+            ${samples.length === 0 ? '<p class="text-slate-500 italic">No sample messages in current 24-hour retention window.</p>' : `
+              <div class="space-y-2">
+                ${samples.map(s => `
+                  <div class="p-2.5 rounded bg-slate-950 border border-slate-800 space-y-1">
+                    <div class="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                      <div class="flex items-center gap-2">
+                        <span class="px-1.5 py-0.5 rounded font-mono font-bold text-[10px] ${s.level === 'ERROR' || s.level === 'FATAL' || s.level === 'CRITICAL' ? 'bg-rose-950 text-rose-400 border border-rose-800' : 'bg-slate-800 text-slate-300'}">${s.level || 'INFO'}</span>
+                        <span class="font-mono text-slate-300">${escapeHtml(formatDetectedAt(s.timestamp))}</span>
+                      </div>
+                      <div class="font-mono text-slate-500 truncate max-w-sm">${escapeHtml(s.source_path || '')}${s.line_number != null ? `:${s.line_number}` : ''}</div>
+                    </div>
+                    <div class="font-mono text-[11px] text-slate-200 bg-slate-900 p-2 rounded break-all leading-relaxed">${escapeHtml(s.sanitized_message || '')}</div>
+                  </div>
+                `).join('')}
+              </div>
+            `}
+          </div>
+        `;
+      } catch (e) {
+        content.innerHTML = `<div class="p-4 rounded bg-rose-950/50 border border-rose-800 text-rose-300">Failed to load template details: ${escapeHtml(e.message)}</div>`;
+      }
+    }
+
+    function closeTemplateDetailModal() {
+      document.getElementById('templateDetailModal').classList.add('hidden');
+    }
+
+    // Diagnostic accordion helper
+    function diagnosticContent(a) {
+      const causes = Array.isArray(a.possible_causes) ? a.possible_causes.map(c => `<li>${escapeHtml(c)}</li>`).join('') : '';
+      const actions = Array.isArray(a.recommended_actions) ? a.recommended_actions.map(act => `<li>${escapeHtml(act)}</li>`).join('') : '';
+      const evidence = Array.isArray(a.evidence_references) ? a.evidence_references.map(ref => {
+        const source = ref.source_path || 'source unavailable';
+        const line = ref.line_number != null ? `:${ref.line_number}` : '';
+        const when = ref.timestamp ? ` @ ${ref.timestamp}` : '';
+        return `<div class="font-mono text-[11px] bg-slate-950/80 p-1.5 rounded border border-slate-800 text-slate-300 break-all">${escapeHtml(source + line + when)}</div>`;
+      }).join('') : '';
+      return `
+        <details class="diagnostic-details text-xs text-slate-400 space-y-2" data-diagnostic-id="${escapeHtml(a.id)}">
+          <summary class="cursor-pointer text-indigo-400 hover:text-indigo-300 font-medium">View Diagnostic Causes, Recommended Actions & Evidence</summary>
+          <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+            <div class="p-2.5 rounded bg-slate-900/60 border border-slate-800">
+              <span class="font-semibold text-slate-200 block mb-1">Possible Root Causes:</span>
+              <ul class="list-disc pl-4 space-y-1 text-slate-300">${causes || '<li>Calculating hypotheses...</li>'}</ul>
+            </div>
+            <div class="p-2.5 rounded bg-slate-900/60 border border-slate-800">
+              <span class="font-semibold text-slate-200 block mb-1">Recommended Actions:</span>
+              <ul class="list-disc pl-4 space-y-1 text-emerald-300">${actions || '<li>Review service health</li>'}</ul>
+            </div>
+          </div>
+          <div class="mt-2 space-y-1">
+            <span class="font-semibold text-slate-300 block">Evidence References:</span>
+            <div class="space-y-1">${evidence || '<span class="text-slate-500">No retained evidence references available</span>'}</div>
+          </div>
+        </details>
+      `;
+    }
+
+    function restoreDiagnosticState() {
+      document.querySelectorAll('.diagnostic-details').forEach(details => {
+        const id = details.dataset.diagnosticId;
+        details.open = openDiagnosticIds.has(id);
+        details.addEventListener('toggle', () => details.open ? openDiagnosticIds.add(id) : openDiagnosticIds.delete(id));
+      });
+    }
+
+    // Render Active Anomalies
+    function renderAnomalies(anomalies) {
+      allActiveAnomalies = Array.isArray(anomalies) ? anomalies : [];
+      updateFilterOptions();
+      applyAnomalyFilters();
+    }
+
+    function renderActiveAnomalies(anomalies) {
+      const container = document.getElementById('anomaliesList');
+      const badge = document.getElementById('anomaliesBadge');
+      const metric = document.getElementById('metricAnomalies');
+
+      badge.innerText = anomalies.length;
+      metric.innerText = anomalies.length;
+
+      if (!anomalies || anomalies.length === 0) {
+        container.innerHTML = `
+          <div class="glass-card rounded-xl p-8 text-center text-slate-400 space-y-3">
+            <i class="fa-solid fa-circle-check text-emerald-400 text-3xl"></i>
+            <h3 class="text-base font-medium text-slate-200">All Services Operating Normally</h3>
+            <p class="text-xs text-slate-500 max-w-md mx-auto">No active frequency spikes, error bursts, or unhandled log templates detected across monitored applications.</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = anomalies.map(a => {
+        const sevHtml = getSeverityBadge(a.severity);
+        const confHtml = getConfidenceBadge(a.confidence);
+
+        return `
+          <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 ${a.severity === 'Sev-0' ? 'border-l-red-500' : a.severity === 'Sev-1' ? 'border-l-orange-500' : a.severity === 'Sev-2' ? 'border-l-amber-500' : 'border-l-indigo-500'}">
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-2">
+                ${sevHtml}
+                ${confHtml}
+                <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-semibold">${escapeHtml(a.application)}</span>
+                <span class="text-xs text-slate-500 font-mono">[${escapeHtml(a.environment)}]</span>
+              </div>
+              <div class="text-xs text-slate-400 font-mono">
+                Count: <span class="text-white font-bold">${a.current_count}</span> (Z: ${a.z_score !== null ? a.z_score : 'New'})
+              </div>
+            </div>
+            <div class="text-[11px] text-slate-400">Detected: <span class="font-mono text-slate-300">${escapeHtml(formatDetectedAt(a.detected_at))}</span></div>
+
+            <!-- AI Summary -->
+            <div class="text-sm font-medium text-slate-100 leading-snug">
+              ${escapeHtml(a.summary || 'Analyzing anomaly pattern with SRE AI worker...')}
+            </div>
+
+            <!-- Template Pattern with Clickable Drill-down -->
+            <div class="text-xs bg-slate-900 p-2.5 rounded border border-slate-800 font-mono text-slate-300 flex items-center justify-between gap-2">
+              <div class="truncate">
+                <span class="text-indigo-400 font-bold">Template:</span> ${escapeHtml(a.template_text)}
+              </div>
+              <button onclick="openTemplateDetailModal('${escapeHtml(a.template_id)}')" class="shrink-0 px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 hover:bg-indigo-900 transition text-[11px]">
+                <i class="fa-solid fa-magnifying-glass-chart mr-1"></i> Drill Down
+              </button>
+            </div>
+
+            ${diagnosticContent(a)}
+
+            <!-- Actions Bar -->
+            <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
+              <button onclick="retryAnomaly('${a.id}')" class="px-2.5 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-300 transition">
+                <i class="fa-solid fa-arrows-rotate mr-1"></i> Retry Triage
+              </button>
+              <button onclick="openDismissModal('${a.id}')" class="px-3 py-1 text-xs rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition shadow shadow-emerald-600/30">
+                <i class="fa-solid fa-clipboard-check mr-1"></i> Resolve / Action
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      restoreDiagnosticState();
+    }
+
+    function getDismissalActionBadge(action) {
+      if (action === 'resolved' || action === 'resolve') {
+        return `<span class="text-[10px] px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-800 font-semibold flex items-center gap-1"><i class="fa-solid fa-check"></i> Resolved</span>`;
+      }
+      if (action === 'false_positive') {
+        return `<span class="text-[10px] px-2 py-0.5 rounded bg-amber-950 text-amber-400 border border-amber-800 font-semibold flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> False Alarm</span>`;
+      }
+      if (action === 'transient') {
+        return `<span class="text-[10px] px-2 py-0.5 rounded bg-blue-950 text-blue-400 border border-blue-800 font-semibold flex items-center gap-1"><i class="fa-solid fa-wave-square"></i> Transient</span>`;
+      }
+      return `<span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">Dismissed</span>`;
+    }
+
+    // Render Dismissed Anomalies
+    function renderDismissed(dismissed) {
+      document.getElementById('dismissedCount').innerText = dismissed.length;
+      const container = document.getElementById('dismissedList');
+      if (!dismissed || dismissed.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500">No dismissed anomalies recorded yet.</p>';
+        return;
+      }
+
+      container.innerHTML = dismissed.map(d => `
+        <div class="glass-card rounded-xl p-5 space-y-4 border-l-4 border-l-slate-500">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              ${getSeverityBadge(d.severity)}
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-semibold">${escapeHtml(d.application)}</span>
+              <span class="text-xs text-slate-500 font-mono">[${escapeHtml(d.environment)}]</span>
+              ${getDismissalActionBadge(d.dismissal_action)}
+            </div>
+            <div class="text-xs text-slate-400 font-mono">Detected: <span class="text-slate-300">${escapeHtml(formatDetectedAt(d.detected_at))}</span></div>
+          </div>
+          <div class="text-sm font-medium text-slate-100">${escapeHtml(d.summary || 'No AI summary recorded.')}</div>
+          <div class="text-xs bg-slate-900 p-2.5 rounded border border-slate-800 font-mono text-slate-300 flex items-center justify-between gap-2">
+            <div class="truncate">
+              <span class="text-indigo-400 font-bold">Template:</span> ${escapeHtml(d.template_text)}
+            </div>
+            <button onclick="openTemplateDetailModal('${escapeHtml(d.template_id)}')" class="shrink-0 px-2 py-0.5 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 hover:bg-indigo-900 transition text-[11px]">
+              <i class="fa-solid fa-magnifying-glass-chart mr-1"></i> Drill Down
+            </button>
+          </div>
+          ${d.dismissal_comment ? (
+            (d.dismissal_action === 'resolved' || d.dismissal_action === 'resolve')
+              ? `<div class="text-xs text-emerald-300 bg-emerald-950/40 border border-emerald-800/60 p-2.5 rounded-lg flex items-start gap-2">
+                   <i class="fa-solid fa-lightbulb text-emerald-400 mt-0.5"></i>
+                   <div><strong class="text-emerald-400">Resolution Steps (Organizational Memory):</strong> "${escapeHtml(d.dismissal_comment)}"</div>
+                 </div>`
+              : `<div class="text-xs text-slate-400 bg-slate-900/60 border border-slate-800 p-2 rounded italic">Feedback: "${escapeHtml(d.dismissal_comment)}"</div>`
+          ) : ''}
+          <div class="text-[11px] text-slate-500">Dismissed: <span class="font-mono text-slate-300">${escapeHtml(formatDetectedAt(d.dismissed_at))}</span></div>
+          ${diagnosticContent(d)}
+        </div>
+      `).join('');
+      restoreDiagnosticState();
+    }
+
+    // Render Sources
+    async function loadSources() {
+      try {
+        const res = await fetch('/api/sources');
+        const sources = await res.json();
+        document.getElementById('metricSources').innerText = sources.length;
+        const container = document.getElementById('sourcesList');
+        if (!sources || sources.length === 0) {
+          container.innerHTML = '<div class="text-slate-500">No sources configured.</div>';
+          return;
+        }
+        container.innerHTML = sources.map(s => `
+          <div class="p-2.5 rounded bg-slate-900/60 border border-slate-800 flex items-center justify-between">
+            <div class="space-y-0.5">
+              <div class="font-medium text-slate-200 flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full ${s.enabled ? 'bg-emerald-400' : 'bg-slate-500'}"></span>
+                ${escapeHtml(s.application)}
+              </div>
+              <div class="text-[11px] text-slate-400 font-mono truncate max-w-xs">${escapeHtml(s.path)}</div>
+            </div>
+            <span class="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-mono">${escapeHtml(s.environment)}</span>
+          </div>
+        `).join('');
+      } catch(e) {
+        console.error(e);
+      }
+    }
+
+    // 5-Minute Bucket Timeline Chart (Phase 5)
+    async function loadTimelineData() {
+      try {
+        const res = await fetch('/api/buckets/timeline?limit=24');
+        if (!res.ok) return;
+        const timeline = await res.json();
+        renderTimelineChart(timeline);
+      } catch (e) {
+        console.error('Timeline error:', e);
+      }
+    }
+
+    function renderTimelineChart(buckets) {
+      const ctx = document.getElementById('timelineChart')?.getContext('2d');
+      if (!ctx) return;
+
+      const sorted = (Array.isArray(buckets) ? [...buckets] : []).sort((a, b) => {
+        return new Date(a.bucket_start).getTime() - new Date(b.bucket_start).getTime();
+      });
+
+      const labels = sorted.map(b => {
+        const d = new Date(b.bucket_start);
+        return Number.isNaN(d.getTime()) ? b.bucket_start : d.toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
+      });
+
+      const totalCounts = sorted.map(b => b.total_count || 0);
+      const errorCounts = sorted.map(b => b.total_error_count || 0);
+
+      if (timelineChartInstance) {
+        timelineChartInstance.data.labels = labels;
+        timelineChartInstance.data.datasets[0].data = totalCounts;
+        timelineChartInstance.data.datasets[1].data = errorCounts;
+        timelineChartInstance.update();
+        return;
+      }
+
+      timelineChartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels.length ? labels : ['Current Window'],
+          datasets: [
+            {
+              label: 'Total Observations',
+              data: totalCounts.length ? totalCounts : [0],
+              borderColor: '#6366f1',
+              backgroundColor: 'rgba(99, 102, 241, 0.15)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.35,
+              pointBackgroundColor: '#818cf8',
+              pointRadius: 3,
+            },
+            {
+              label: 'Error Spikes',
+              data: errorCounts.length ? errorCounts : [0],
+              borderColor: '#f43f5e',
+              backgroundColor: 'rgba(244, 63, 94, 0.25)',
+              borderWidth: 2,
+              fill: true,
+              tension: 0.35,
+              pointBackgroundColor: '#fb7185',
+              pointRadius: 3,
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: 'rgba(15, 23, 42, 0.95)',
+              titleColor: '#e2e8f0',
+              bodyColor: '#cbd5e1',
+              borderColor: 'rgba(255, 255, 255, 0.1)',
+              borderWidth: 1,
+              padding: 10,
+              displayColors: true,
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } }
+            },
+            y: {
+              grid: { color: 'rgba(255, 255, 255, 0.05)' },
+              ticks: { color: '#64748b', font: { family: 'monospace', size: 10 } },
+              beginAtZero: true
+            }
+          }
+        }
+      });
+    }
+
+    // Dismiss Modal Handlers
+    function selectDismissAction(action) {
+      document.getElementById('dismissAction').value = action;
+      const btnRes = document.getElementById('actionBtnResolved');
+      const btnFP = document.getElementById('actionBtnFalsePositive');
+      const btnTr = document.getElementById('actionBtnTransient');
+      const submitBtn = document.getElementById('dismissSubmitBtn');
+      const commentLabel = document.getElementById('dismissCommentLabel');
+      const commentArea = document.getElementById('dismissComment');
+
+      [btnRes, btnFP, btnTr].forEach(b => {
+        if (b) b.className = "p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-slate-800/60 border-slate-700 text-slate-400 hover:border-slate-500";
+      });
+
+      if (action === 'resolved') {
+        if (btnRes) btnRes.className = "p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-emerald-950/50 border-emerald-500 text-emerald-300 ring-1 ring-emerald-500";
+        if (submitBtn) {
+          submitBtn.className = "px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition shadow-lg shadow-emerald-900/30";
+          submitBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> Confirm Resolution';
+        }
+        if (commentLabel) commentLabel.innerHTML = 'Remediation Steps & Fix Notes <span class="text-emerald-400 text-[11px]">(Indexed for AI Triage)</span>';
+        if (commentArea) commentArea.placeholder = 'e.g., Scaled connection pool to 50; rotated expired token; verified health checks.';
+      } else if (action === 'false_positive') {
+        if (btnFP) btnFP.className = "p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-amber-950/50 border-amber-500 text-amber-300 ring-1 ring-amber-500";
+        if (submitBtn) {
+          submitBtn.className = "px-4 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium transition shadow-lg shadow-amber-900/30";
+          submitBtn.innerHTML = '<i class="fa-solid fa-shield-halved mr-1"></i> Mark False Alarm';
+        }
+        if (commentLabel) commentLabel.innerHTML = 'Reason for False Alarm <span class="text-amber-400 text-[11px]">(Optional)</span>';
+        if (commentArea) commentArea.placeholder = 'e.g., Scheduled load test from staging runner; harmless spike.';
+      } else {
+        if (btnTr) btnTr.className = "p-2.5 rounded-lg border text-left transition flex flex-col justify-between bg-blue-950/50 border-blue-500 text-blue-300 ring-1 ring-blue-500";
+        if (submitBtn) {
+          submitBtn.className = "px-4 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition shadow-lg shadow-blue-900/30";
+          submitBtn.innerHTML = '<i class="fa-solid fa-wave-square mr-1"></i> Dismiss Transient';
+        }
+        if (commentLabel) commentLabel.innerHTML = 'Transient Blip Notes <span class="text-blue-400 text-[11px]">(Optional)</span>';
+        if (commentArea) commentArea.placeholder = 'e.g., Momentary network blip during rolling pod upgrade.';
+      }
+    }
+
+    function openDismissModal(anomalyId) {
+      document.getElementById('dismissAnomalyId').value = anomalyId;
+      document.getElementById('dismissComment').value = '';
+      selectDismissAction('resolved');
+      document.getElementById('dismissModal').classList.remove('hidden');
+    }
+
+    function closeDismissModal() {
+      document.getElementById('dismissModal').classList.add('hidden');
+    }
+
+    async function confirmDismiss() {
+      const anomalyId = document.getElementById('dismissAnomalyId').value;
+      const action = document.getElementById('dismissAction').value || 'resolved';
+      const comment = document.getElementById('dismissComment').value;
+      try {
+        await fetch(`/api/anomalies/${anomalyId}/dismiss`, {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({comment: comment, action: action})
+        });
+        closeDismissModal();
+        refreshData();
+      } catch(e) {
+        alert('Error recording incident action: ' + e);
+      }
+    }
+
+    async function retryAnomaly(anomalyId) {
+      const button = document.querySelector(`button[onclick="retryAnomaly('${anomalyId}')"]`);
+      if (button) { button.disabled = true; button.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> Retrying...'; }
+      try {
+        const response = await fetch(`/api/anomalies/${anomalyId}/retry`, {method: 'POST'});
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data.detail || `Request failed (${response.status})`);
+        await refreshData();
+      } catch(e) {
+        alert('Error retrying anomaly triage: ' + e);
+      } finally {
+        if (button) { button.disabled = false; button.innerHTML = '<i class="fa-solid fa-arrows-rotate mr-1"></i> Retry Triage'; }
+      }
+    }
+
+    // Ask AI
+    async function askAI() {
+      const query = document.getElementById('aiQueryInput').value.trim();
+      if (!query) return;
+      
+      const btn = document.getElementById('btnAskAI');
+      const box = document.getElementById('aiResponseBox');
+      const text = document.getElementById('aiResponseText');
+      
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reasoning...';
+      box.classList.remove('hidden');
+      text.innerText = 'Analyzing active observations, anomalies, and historical embeddings...';
+
+      try {
+        const res = await fetch('/api/ask-ai', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({query: query})
+        });
+        const data = await res.json();
+        text.innerText = data.answer || 'No response returned.';
+      } catch(e) {
+        text.innerText = 'Error querying Ask AI assistant: ' + e;
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-xs"></i> Ask Copilot';
+      }
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Refresh all endpoints
+    async function refreshData() {
+      try {
+        const [telRes, actRes, disRes, tplRes] = await Promise.all([
+          fetch('/api/telemetry'),
+          fetch('/api/anomalies/active'),
+          fetch('/api/anomalies/dismissed'),
+          fetch('/api/templates')
+        ]);
+        
+        const tel = await telRes.json();
+        const act = await actRes.json();
+        const dis = await disRes.json();
+        const tpl = await tplRes.json();
+        allDismissedAnomalies = Array.isArray(dis) ? dis : [];
+        updateFilterOptions();
+
+        document.getElementById('metricIngestRate').innerText = tel.ingestion_rate_lps || 0;
+        document.getElementById('metricTotalLines').innerText = tel.total_lines_read || 0;
+        document.getElementById('metricLag').innerText = tel.kafka_consumer_lag || 0;
+        document.getElementById('metricDropped').innerText = tel.dropped_events || 0;
+        document.getElementById('metricTemplates').innerText = (tpl || []).length;
+        renderTemplates(tpl);
+
+        if (tel.data_loss_warning || tel.dropped_events > 0) {
+          document.getElementById('warningBanner').classList.remove('hidden');
+          document.getElementById('warningText').innerText = `Warning: ${tel.dropped_events} events dropped under high backpressure queue load.`;
+        } else {
+          document.getElementById('warningBanner').classList.add('hidden');
+        }
+
+        renderAnomalies(act);
+        renderDismissed(dis);
+        loadTimelineData();
+      } catch(e) {
+        console.error('Data refresh error:', e);
+      }
+    }
+
+    // Connect SSE Stream
+    function initEventStream() {
+      const eventSource = new EventSource('/api/stream');
+      eventSource.onmessage = function(event) {
+        try {
+          const data = JSON.parse(event.data);
+          const m = data.metrics || {};
+          document.getElementById('metricIngestRate').innerText = m.ingestion_rate_lps || 0;
+          document.getElementById('metricTotalLines').innerText = m.total_lines_read || 0;
+          document.getElementById('metricLag').innerText = m.kafka_consumer_lag || 0;
+          document.getElementById('metricDropped').innerText = m.dropped_events || 0;
+          
+          if (m.data_loss_warning || m.dropped_events > 0) {
+            document.getElementById('warningBanner').classList.remove('hidden');
+            document.getElementById('warningText').innerText = `Warning: ${m.dropped_events} events dropped under high backpressure queue load.`;
+          } else {
+            document.getElementById('warningBanner').classList.add('hidden');
+          }
+
+          if (data.active_anomalies) {
+            renderAnomalies(data.active_anomalies);
+          }
+          if (data.recent_templates) {
+            document.getElementById('metricTemplates').innerText = data.recent_templates.length;
+          }
+        } catch(e) {
+          console.error('Error parsing SSE:', e);
+        }
+      };
+
+      eventSource.onerror = function() {
+        // Fallback to polling if SSE disconnected
+        document.getElementById('connectionStatus').innerHTML = '<span class="w-2 h-2 rounded-full bg-amber-400"></span><span>Polling</span>';
+      };
+    }
+
+    // Init on load
+    window.addEventListener('DOMContentLoaded', () => {
+      loadSources();
+      refreshData();
+      initEventStream();
+      setInterval(refreshData, 10000); // Background refresh backup
+      setInterval(loadTimelineData, 30000);
+    });
+  </script>
+</body>
+</html>

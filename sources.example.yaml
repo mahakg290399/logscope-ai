@@ -1,0 +1,30 @@
+# LogScope AI - Configured Sources Definition
+# Retention policy (defaults: 24 hours sample evidence, 6 months metrics rollups)
+retention:
+  sample_retention_hours: 24
+  aggregate_retention_months: 6
+
+sources:
+  - id: auth-service-prod
+    application: auth-service
+    environment: production
+    path: ./logs/auth-service/*.log
+    multiline:
+      pattern: '^\d{4}-\d{2}-\d{2}' # Starts with YYYY-MM-DD
+      negate: true                  # Continuation lines don't match pattern
+    format: auto                    # auto, json, or regex
+
+  - id: payment-api-prod
+    application: payment-api
+    environment: production
+    path: ./logs/payment-api/app.log
+    multiline:
+      pattern: '^(DEBUG|INFO|WARN|ERROR|FATAL|\[)'
+      negate: true
+    format: auto
+
+  - id: order-service-prod
+    application: order-service
+    environment: production
+    path: ./logs/order-service/order.log
+    format: json

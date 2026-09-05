@@ -1,0 +1,50 @@
+# LogScope AI — continuous integration.
+# Free on public repos (unlimited standard-runner minutes).
+# Runs pytest plus Docker Compose validation for local and Oracle stacks.
+
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Run test suite
+        run: python -m pytest -q
+
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate local stack
+        run: docker compose -f docker-compose.yml config >/dev/null
+
+      - name: Validate Oracle production stack
+        env:
+          # Dummy value so `docker compose config` can resolve the required
+          # ${LOGSCOPE_DOMAIN:?} interpolation without real secrets.
+          LOGSCOPE_DOMAIN: ci.example.com
+        run: |
+          # env_file (../../secrets/.env.runtime, i.e. repo-root secrets/)
+          # must exist for config validation. This dummy file is ephemeral
+          # to the runner and never committed (/secrets/ is gitignored).
+          mkdir -p secrets
+          printf 'LOGSCOPE_ENV=production\nLOGSCOPE_HOST=0.0.0.0\nLOGSCOPE_PORT=8000\nLOGSCOPE_KAFKA_BOOTSTRAP_SERVERS=kafka:29092\nLOGSCOPE_KAFKA_EMBEDDED_FALLBACK=false\n' > secrets/.env.runtime
+          cd deploy/oracle
+          docker compose -f docker-compose.production.yml config >/dev/null

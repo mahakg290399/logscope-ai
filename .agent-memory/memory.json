@@ -1,11 +1,11 @@
-{
-  "servers": {
-    "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "env": {
-        "MEMORY_FILE_PATH": "${workspaceFolder}/.agent-memory/memory.json"
-      }
-    }
-  }
-}
+{"type":"entity","name":"LogScope_AI","entityType":"project","observations":["Python POC for enterprise SRE log aggregation, anomaly detection, and AI incident triage.","Repository source of truth is PRD.md for requirements and progress.md for implementation status.","Primary local entry point is python main.py; the HTTP service defaults to localhost:8000.","Verified 2026-08-20: python -m pytest -q passes 25 tests; dependency deprecation warnings remain.","The POC is not production-complete; production gaps include remote/S3 connectors, auth and multi-user controls, external alerting, HA/cloud deployment, stronger HMAC pseudonymization, and scheduled retention.","Raw logs must never cross Kafka or enter AI prompts; evidence is bounded and redacted. Source: docs/PROJECT_CONTEXT.md and PRD.md."]}
+{"type":"entity","name":"LogScope_Architecture","entityType":"architecture","observations":["Read-only log tailing and multiline parsing feed sanitization before Drain3 template mining.","Docker mode uses sanitized Kafka events; bounded in-memory streaming is an explicit test fallback.","Five-minute aggregation and deterministic anomaly detection persist through SQLite WAL storage and a local vector index.","FastAPI REST and SSE endpoints serve the dashboard and asynchronous AI triage worker.","Sources require application and environment; Drain3 processing is isolated by that pair and correlation begins at application + environment + time window.","SQLite WAL stores normalized metadata, templates, buckets, samples, anomalies, analyses, feedback, checkpoints, embeddings, and retention metadata.","AI triage uses structured provider clients with a deterministic heuristic fallback when providers are unavailable."]}
+{"type":"entity","name":"Project_Workflow","entityType":"workflow","observations":["Run python -m pytest -v for the full test suite.","Run python main.py --host 127.0.0.1 --port 8000 for local development.","Record durable architectural decisions in docs/DECISIONS.md and current implementation state in progress.md.","Use the memory MCP for compact project facts and decisions, not as a replacement for source control or the full codebase.","For durable changes, inspect git diff --name-status and git diff --stat, read only changed files plus direct contracts/tests, update docs/PROJECT_CONTEXT.md, docs/DECISIONS.md, or progress.md, then run focused/full tests.","docs/MEMORY_MAINTENANCE.md defines major changes, incremental refresh, stable MCP entities, and the rule that Git-tracked docs override conflicting MCP facts."]}
+{"type":"entity","name":"Project_Decisions","entityType":"decision_record","observations":["Sanitize before streaming; Kafka is the Docker boundary and bounded in-memory mode is explicit fallback. Source: docs/DECISIONS.md.","Deterministic anomaly detection precedes AI triage to preserve objective signals and provider independence. Source: docs/DECISIONS.md.","Project memory is layered: Git-tracked docs are canonical, MCP stores compact facts, and code summaries refresh by changed-file hash. Source: docs/DECISIONS.md."]}
+{"type":"entity","name":"Project_Risks","entityType":"risk_register","observations":["POC limitations must not be mistaken for production guarantees: localhost single-user operation, unsalted SHA-256 client hashing, local-file-only ingestion, and provider fallback.","Automatic scheduled retention cleanup is not yet enabled even though retention primitives and tests exist. Source: docs/PROJECT_CONTEXT.md and progress.md."]}
+{"type":"relation","from":"LogScope_AI","to":"LogScope_Architecture","relationType":"has_architecture"}
+{"type":"relation","from":"LogScope_AI","to":"Project_Workflow","relationType":"uses_workflow"}
+{"type":"relation","from":"LogScope_AI","to":"Project_Decisions","relationType":"has_decisions"}
+{"type":"relation","from":"LogScope_AI","to":"Project_Risks","relationType":"has_risks"}
+{"type":"relation","from":"Project_Workflow","to":"Project_Decisions","relationType":"maintains"}
+{"type":"relation","from":"Project_Workflow","to":"Project_Risks","relationType":"maintains"}

@@ -1,0 +1,50 @@
+# LogScope AI — continuous deployment to Oracle Always Free.
+# Free on public repos (unlimited standard-runner minutes).
+#
+# Prerequisites (see docs/ORACLE_SETUP_PLAN.md) — nothing here works until:
+#   1. The Ampere A1 VM exists with the repo cloned at /opt/logscope.
+#   2. /etc/logscope/oci-secrets.conf holds OCI_REGION, secret OCIDs and
+#      LOGSCOPE_DOMAIN (secret identifiers only — never API keys).
+#   3. Repo Settings → Secrets → Actions defines OCI_HOST, OCI_USER,
+#      OCI_SSH_KEY. No LLM API key ever enters GitHub.
+#   4. An Environment named `production` exists (fails closed otherwise).
+#
+# Design notes:
+# - The VM rebuilds natively on ARM (no slow QEMU cross-build, no registry).
+# - API keys are refreshed on the VM via instance-principal
+#   (bootstrap-secrets.sh), never pulled from GitHub.
+
+name: CD
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+concurrency:
+  group: oracle-prod
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy to Oracle VM over SSH
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.OCI_HOST }}
+          username: ${{ secrets.OCI_USER }}
+          key: ${{ secrets.OCI_SSH_KEY }}
+          script: |
+            set -euo pipefail
+            cd /opt/logscope
+            git pull --ff-only
+            cd deploy/oracle
+            set -a; . /etc/logscope/oci-secrets.conf; set +a
+            : "${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN in /etc/logscope/oci-secrets.conf}"
+            sudo -n ./bootstrap-secrets.sh
+            docker compose --env-file /opt/logscope/secrets/.env.runtime \
+              -f docker-compose.production.yml up -d --build
+            docker compose -f docker-compose.production.yml ps
+            curl -fsS "https://$LOGSCOPE_DOMAIN/api/health"

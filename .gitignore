@@ -1,0 +1,27 @@
+.env
+.env.*
+!.env.example
+
+# OCI deployment runtime secrets
+deploy/oracle/.env.runtime
+deploy/oracle/secrets/
+# Ephemeral CI dummy runtime file (created by .github/workflows/ci.yml)
+secrets/
+*.oci-config
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Runtime SQLite databases and benchmark/e2e artifacts (may hold log samples)
+data/
+logs/**/*.log
+
+.agent-memory/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/

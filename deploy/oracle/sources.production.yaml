@@ -1,0 +1,24 @@
+sources:
+  - id: auth-service-prod
+    application: auth-service
+    environment: production
+    path: /app/logs/auth-service/*.log
+    multiline:
+      pattern: '^\\d{4}-\\d{2}-\\d{2}'
+      negate: true
+    format: auto
+
+  - id: payment-api-prod
+    application: payment-api
+    environment: production
+    path: /app/logs/payment-api/app.log
+    multiline:
+      pattern: '^(DEBUG|INFO|WARN|ERROR|FATAL|\\[)'
+      negate: true
+    format: auto
+
+  - id: order-service-prod
+    application: order-service
+    environment: production
+    path: /app/logs/order-service/order.log
+    format: json
