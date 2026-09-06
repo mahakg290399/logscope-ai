@@ -53,6 +53,10 @@
     <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-2">LogScope AI <span class="bg-gradient-to-r from-cyan-300 to-violet-400 bg-clip-text text-transparent">v2.0</span></h1>
     <p class="mt-2 text-slate-400 text-sm">SRE log aggregation, deterministic anomaly detection &amp; AI incident triage &mdash; problem, architecture, tooling, dashboard guide, current deployment stack and hardening path. Last updated 2026-09-06. Live system: <code>logscope.freengineer.me</code>.</p>
 
+    <figure class="my-6 rounded-xl overflow-hidden border border-slate-800/70" id="heroFig" style="display:none">
+      <img src="/img/hero.jpg" alt="LogScope visual" class="w-full h-44 object-cover" onload="document.getElementById('heroFig').style.display='block'">
+    </figure>
+
     <h2>1. The problem we solve</h2>
     <p>Modern services emit thousands of log lines per second across multiple files, hosts and formats. Engineers face four pains:</p>
     <ol>
@@ -63,7 +67,9 @@
     </ol>
     <p>LogScope treats logs as an <em>application heartbeat</em>: compress repetition into templates, watch the pulse for arrhythmia with deterministic rules, and call the LLM only as a triage copilot over sanitized, bounded evidence.</p>
     <figure class="glass rounded-xl p-4 my-4">
-    <svg viewBox="0 0 720 220" class="w-full" role="img" aria-label="Log volume压缩 into templates illustration">
+    <img src="/img/fig-problem.jpg" alt="Engineer facing a wall of logs with one highlighted error" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig1fallback').style.display='block'">
+    <div id="fig1fallback" style="display:none">
+    <svg viewBox="0 0 720 220" class="w-full" role="img" aria-label="Log volume into templates illustration">
       <g font-family="monospace" font-size="10">
         <text x="12" y="18" fill="#7d8aa5">raw stream: 1,000+ lines/sec, mostly repetition</text>
         <g>
@@ -90,7 +96,8 @@
         <text x="345" y="192" fill="#7d8aa5">3 templates stand in for 60,000+ lines</text>
       </g>
     </svg>
-    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 1 &mdash; Repetition compressed into templates; the novel error surfaces automatically.</figcaption>
+    </div>
+    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 1 &mdash; Repetition compressed into templates; the novel error surfaces automatically. (Illustrative render; mock data.)</figcaption>
     </figure>
 
     <h2>2. Design principles</h2>
@@ -180,6 +187,8 @@
     <h3>5-Minute Ingestion Volume &amp; Anomaly Timeline</h3>
     <p>Chart.js chart of bucketed observation volume (cyan) overlaid with error spikes (rose), fed by <code>/api/buckets/timeline</code>. Refresh icon reloads on demand; it answers &ldquo;did anything just change?&rdquo; at a glance.</p>
     <figure class="glass rounded-xl p-4 my-4">
+    <img src="/img/fig-dashboard.jpg" alt="Dashboard render with KPIs, severity cards, timeline and AI chat" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig2fallback').style.display='block'">
+    <div id="fig2fallback" style="display:none">
     <svg viewBox="0 0 720 250" class="w-full" role="img" aria-label="Timeline chart illustration">
       <g font-family="monospace" font-size="10">
         <text x="12" y="18" fill="#7d8aa5">5-minute buckets &mdash; observation volume (cyan) + error spikes (rose)</text>
@@ -198,10 +207,15 @@
         <rect x="500" y="48" width="12" height="12" rx="3" fill="rgba(251,113,133,.4)" stroke="#fb7185"/><text x="518" y="58" fill="#fecdd3">Error spikes</text>
       </g>
     </svg>
-    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 2 &mdash; The 5-minute timeline: steady heartbeat, one arrhythmia worth triaging.</figcaption>
+    </div>
+    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 2 &mdash; The 5-minute timeline: steady heartbeat, one arrhythmia worth triaging. (Illustrative render; mock data.)</figcaption>
     </figure>
     <h3>Active Anomalies + filters</h3>
     <p>Each card carries an <code>INC</code> + 7-digit incident number, severity (Sev-0 critical &hellip; Sev-4 info), confidence (very-low&hellip;very-high), AI summary, evidence (template IDs, counts, source path/line), possible causes and recommended actions. The auto-refresh dropdown (5s/10s/30s/60s/Off) plus manual Refresh control polling; severity/application/environment/source filters narrow the feed. Empty state (&ldquo;All Services Operating Normally&rdquo;) confirms detectors ran and found nothing &mdash; distinct from a disconnected stream.</p>
+    <figure class="glass rounded-xl p-4 my-4">
+      <img src="/img/fig-triage.jpg" alt="AI incident triage card render" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
+      <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 3 &mdash; Triage card: severity, confidence, evidence and actions. (Illustrative render; mock data.)</figcaption>
+    </figure>
     <h3>Dismissed Anomalies Archive</h3>
     <p>Collapsible history with outcome badges: green Resolved, amber False Alarm, slate Transient. Nothing is deleted &mdash; every verdict stays queryable for future AI context.</p>
     <h3>Ask SRE Copilot</h3>
@@ -215,6 +229,10 @@
 
     <h2>6. Current deployment stack</h2>
     <p>LogScope runs today as a single <strong class="text-slate-100">Oracle Always Free</strong> Ampere A1 VM (2 OCPU / 12 GB, Terraform-managed, reserved public IP) hosting Kafka, the app, the demo workload generator and Caddy edge proxy for <code>https://logscope.freengineer.me</code>. LLM secrets live in OCI Vault and are refreshed on the VM via instance principal &mdash; they never appear in git, images or CI. Two GitHub Actions workflows operate it: <code>infra.yml</code> (infrastructure apply/destroy) and <code>cd.yml</code> (pull, native-ARM rebuild, health-gated at <code>/api/health</code>). Total cost: <strong class="text-slate-100">$0/month</strong> inside Always Free limits (200 GB disk, 10 TB egress).</p>
+    <figure class="glass rounded-xl p-4 my-4">
+      <img src="/img/fig-deploy.jpg" alt="Deployment render: containers, secrets vault and dashboard" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
+      <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 4 &mdash; Code to cloud: containers, Vault-held secrets, HTTPS to the browser. (Illustrative render.)</figcaption>
+    </figure>
     <table>
       <tr><th>Piece</th><th>What runs</th><th>Notes</th></tr>
       <tr><td>Compute</td><td>1&times; VM.Standard.A1.Flex, Ubuntu 24.04 ARM</td><td>Terraform state in OCI Object Storage; live VM imported, replacement-guarded</td></tr>

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -73,6 +74,11 @@ def create_app(
 
     app.state.service = service
     app.state.settings = settings
+
+    # Whitepaper figure assets (AI renders in web/img/; see README.txt there)
+    img_dir = Path(__file__).parent.parent / "web" / "img"
+    if img_dir.is_dir():
+        app.mount("/img", StaticFiles(directory=str(img_dir)), name="whitepaper-img")
 
     @app.get("/api/health")
     async def health_check():
