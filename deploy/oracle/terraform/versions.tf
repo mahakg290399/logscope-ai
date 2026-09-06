@@ -1,4 +1,11 @@
 terraform {
+  backend "oci" {
+    bucket    = "logscope-terraform-state"
+    namespace = "bmsfcd4g3w9x"
+    key       = "logscope/production/terraform.tfstate"
+    auth      = "APIKey"
+  }
+
   required_version = ">= 1.2.0"
   required_providers {
     oci = {

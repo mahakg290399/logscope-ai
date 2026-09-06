@@ -31,6 +31,19 @@ jobs:
           terraform_version: "1.7.5"
           terraform_wrapper: false
 
+      - name: Prepare OCI backend credentials
+        env:
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+        run: |
+          backend_key="$RUNNER_TEMP/oci_api_key.pem"
+          umask 077
+          printf '%s\n' "$OCI_PRIVATE_KEY" > "$backend_key"
+          echo "OCI_PRIVATE_KEY_PATH=$backend_key" >> "$GITHUB_ENV"
+          echo "OCI_TENANCY_OCID=${{ secrets.OCI_TENANCY_OCID }}" >> "$GITHUB_ENV"
+          echo "OCI_USER_OCID=${{ secrets.OCI_USER_OCID }}" >> "$GITHUB_ENV"
+          echo "OCI_FINGERPRINT=${{ secrets.OCI_FINGERPRINT }}" >> "$GITHUB_ENV"
+          echo "OCI_REGION=${{ secrets.OCI_REGION }}" >> "$GITHUB_ENV"
+
       - name: Terraform Init
         working-directory: deploy/oracle/terraform
         run: terraform init

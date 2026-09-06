@@ -5,6 +5,9 @@ This Terraform module automatically provisions:
 2. **Security List** opening ports `22` (SSH), `80` (HTTP), and `443` (HTTPS for Caddy / LogScope).
 3. **Ampere A1 Compute Instance** (`VM.Standard.A1.Flex`, 2 OCPU, 12 GB RAM) running **Canonical Ubuntu 24.04 ARM64**.
 
+Terraform state is stored in the private, versioned OCI Object Storage bucket
+`logscope-terraform-state` under `logscope/production/terraform.tfstate`.
+
 > **Zero Secrets Policy**: No passwords, API keys, private keys, or account IDs are stored in these files. All values are passed dynamically via variables at execution time.
 
 ## OCI permissions
