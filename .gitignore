@@ -9,6 +9,7 @@ deploy/oracle/deployment.local.env
 # Ephemeral CI dummy runtime file (created by .github/workflows/ci.yml)
 secrets/
 *.oci-config
+.terraform/
 
 __pycache__/
 *.py[cod]
