@@ -46,7 +46,7 @@ jobs:
             cd deploy/oracle
             : "${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN in the GitHub production environment}"
             sudo -n ./bootstrap-secrets.sh
-            docker compose --env-file /opt/logscope/secrets/.env.runtime \
+            LOGSCOPE_DOMAIN="$LOGSCOPE_DOMAIN" docker compose --env-file /opt/logscope/secrets/.env.runtime \
               -f docker-compose.production.yml up -d --build
             docker compose -f docker-compose.production.yml ps
             curl -fsS "https://$LOGSCOPE_DOMAIN/api/health"
