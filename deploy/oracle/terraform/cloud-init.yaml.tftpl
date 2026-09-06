@@ -38,6 +38,7 @@ write_files:
 
 runcmd:
   - systemctl enable --now docker
+  - chown ${deploy_user}:${deploy_user} /home/${deploy_user}
   - install -d -m 0700 -o ${deploy_user} -g ${deploy_user} /home/${deploy_user}/.ssh
   - chown ${deploy_user}:${deploy_user} /home/${deploy_user}/.ssh/authorized_keys
   - git clone ${repository_url} /opt/logscope
