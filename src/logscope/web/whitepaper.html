@@ -67,7 +67,7 @@
     </ol>
     <p>LogScope treats logs as an <em>application heartbeat</em>: compress repetition into templates, watch the pulse for arrhythmia with deterministic rules, and call the LLM only as a triage copilot over sanitized, bounded evidence.</p>
     <figure class="glass rounded-xl p-4 my-4">
-    <img src="/img/fig-problem.jpg" alt="Engineer facing a wall of logs with one highlighted error" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig1fallback').style.display='block'">
+    <img src="/img/rgyfoa2dnojgjqplg54q.png" alt="Engineer facing a wall of logs with one highlighted error" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig1fallback').style.display='block'">
     <div id="fig1fallback" style="display:none">
     <svg viewBox="0 0 720 220" class="w-full" role="img" aria-label="Log volume into templates illustration">
       <g font-family="monospace" font-size="10">
@@ -187,7 +187,7 @@
     <h3>5-Minute Ingestion Volume &amp; Anomaly Timeline</h3>
     <p>Chart.js chart of bucketed observation volume (cyan) overlaid with error spikes (rose), fed by <code>/api/buckets/timeline</code>. Refresh icon reloads on demand; it answers &ldquo;did anything just change?&rdquo; at a glance.</p>
     <figure class="glass rounded-xl p-4 my-4">
-    <img src="/img/fig-dashboard.jpg" alt="Dashboard render with KPIs, severity cards, timeline and AI chat" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig2fallback').style.display='block'">
+    <img src="/img/iuv5zob28glntc7zrp3i.png" alt="Dashboard render with KPIs, severity cards, timeline and AI chat" class="w-full rounded-lg" onerror="this.remove();document.getElementById('fig2fallback').style.display='block'">
     <div id="fig2fallback" style="display:none">
     <svg viewBox="0 0 720 250" class="w-full" role="img" aria-label="Timeline chart illustration">
       <g font-family="monospace" font-size="10">
@@ -213,7 +213,7 @@
     <h3>Active Anomalies + filters</h3>
     <p>Each card carries an <code>INC</code> + 7-digit incident number, severity (Sev-0 critical &hellip; Sev-4 info), confidence (very-low&hellip;very-high), AI summary, evidence (template IDs, counts, source path/line), possible causes and recommended actions. The auto-refresh dropdown (5s/10s/30s/60s/Off) plus manual Refresh control polling; severity/application/environment/source filters narrow the feed. Empty state (&ldquo;All Services Operating Normally&rdquo;) confirms detectors ran and found nothing &mdash; distinct from a disconnected stream.</p>
     <figure class="glass rounded-xl p-4 my-4">
-      <img src="/img/fig-triage.jpg" alt="AI incident triage card render" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
+      <img src="/img/cxnhbeu88br8wcnrtfir.png" alt="AI incident triage card render" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
       <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 3 &mdash; Triage card: severity, confidence, evidence and actions. (Illustrative render; mock data.)</figcaption>
     </figure>
     <h3>Dismissed Anomalies Archive</h3>
@@ -230,7 +230,7 @@
     <h2>6. Current deployment stack</h2>
     <p>LogScope runs today as a single <strong class="text-slate-100">Oracle Always Free</strong> Ampere A1 VM (2 OCPU / 12 GB, Terraform-managed, reserved public IP) hosting Kafka, the app, the demo workload generator and Caddy edge proxy for <code>https://logscope.freengineer.me</code>. LLM secrets live in OCI Vault and are refreshed on the VM via instance principal &mdash; they never appear in git, images or CI. Two GitHub Actions workflows operate it: <code>infra.yml</code> (infrastructure apply/destroy) and <code>cd.yml</code> (pull, native-ARM rebuild, health-gated at <code>/api/health</code>). Total cost: <strong class="text-slate-100">$0/month</strong> inside Always Free limits (200 GB disk, 10 TB egress).</p>
     <figure class="glass rounded-xl p-4 my-4">
-      <img src="/img/fig-deploy.jpg" alt="Deployment render: containers, secrets vault and dashboard" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
+      <img src="/img/xv3xidu3hzt3pgjeevn3.png" alt="Deployment render: containers, secrets vault and dashboard" class="w-full rounded-lg" onerror="this.closest('figure').style.display='none'">
       <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 4 &mdash; Code to cloud: containers, Vault-held secrets, HTTPS to the browser. (Illustrative render.)</figcaption>
     </figure>
     <table>
