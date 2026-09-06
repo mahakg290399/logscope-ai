@@ -4,8 +4,16 @@
 set -Eeuo pipefail
 
 SECRETS_DIR="${LOGSCOPE_SECRETS_DIR:-/opt/logscope/secrets}"
-OCI_REGION="${OCI_REGION:?Set OCI_REGION to the VM region}"
 OCI_CLI="${OCI_CLI:-oci}"
+
+CONFIG_FILE="${LOGSCOPE_OCI_CONFIG_FILE:-/etc/logscope/oci-secrets.conf}"
+if [[ -r "$CONFIG_FILE" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$CONFIG_FILE"
+  set +a
+fi
+OCI_REGION="${OCI_REGION:?Set OCI_REGION to the VM region}"
 
 # Secret OCIDs are identifiers, not secret values. Keep them in the VM's root-owned
 # configuration rather than putting secret values in shell history or process args.

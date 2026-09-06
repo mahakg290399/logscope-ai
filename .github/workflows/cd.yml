@@ -44,7 +44,6 @@ jobs:
             cd /opt/logscope
             git pull --ff-only
             cd deploy/oracle
-            set -a; . /etc/logscope/oci-secrets.conf; set +a
             : "${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN in the GitHub production environment}"
             sudo -n ./bootstrap-secrets.sh
             docker compose --env-file /opt/logscope/secrets/.env.runtime \
