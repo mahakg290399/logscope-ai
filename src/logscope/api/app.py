@@ -94,7 +94,8 @@ def create_app(
         """
         try:
             body = await request.json()
-        except Exception:
+        except Exception as json_err:
+            logger.warning("[API:Ingest] Rejected payload: invalid JSON received (%s)", json_err)
             raise HTTPException(status_code=400, detail="Invalid JSON payload")
 
         logs_list: List[Any] = []
@@ -109,6 +110,7 @@ def create_app(
                 env_name = body.get("environment") if "environment" in body else environment
                 src_name = body.get("source_name") or src_name
                 if not (app_name or "").strip() or not (env_name or "").strip():
+                    logger.warning("[API:Ingest] Rejected payload: missing 'application' or 'environment' in structured batch")
                     raise HTTPException(status_code=400, detail="Fields 'application' and 'environment' are required")
             else:
                 logs_list = [body]
@@ -123,6 +125,7 @@ def create_app(
                 env_name = environment or first.get("environment") or first.get("env") or settings.env
                 src_name = src_name or first.get("source_name") or "fluent-bit"
         else:
+            logger.warning("[API:Ingest] Rejected payload: body is neither a JSON object nor an array")
             raise HTTPException(status_code=400, detail="Payload must be a JSON object or array")
 
         app_name = (app_name or "default-app").strip()
@@ -137,6 +140,7 @@ def create_app(
             lines=logs_list,
             source_name=src_name,
         )
+        logger.info("[API:Ingest] Accepted %d logs for app='%s' env='%s' from '%s'", count, app_name, env_name, src_name)
         return {
             "status": "accepted",
             "ingested": count,

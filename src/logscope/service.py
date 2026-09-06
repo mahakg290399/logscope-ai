@@ -296,7 +296,7 @@ class LogScopeService:
             batches = self._pending_ai_batches
             self._pending_ai_batches = {}
         for key, anomalies in batches.items():
-            logger.info("Triaging %d related anomalies for %s/%s", len(anomalies), *key)
+            logger.info("[Service:AIBatch] Triaging %d related anomalies for %s/%s", len(anomalies), *key)
             results = await self.ai_worker.analyze_batch(anomalies)
             self.openai_error_count += sum(1 for result in results if result.error)
 
@@ -309,7 +309,7 @@ class LogScopeService:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("Error flushing aggregates: %s", e)
+                logger.error("[Service:Aggregator] Error flushing aggregates to SQLite: %s", e, exc_info=True)
 
     async def _periodic_retention_loop(self):
         """Runs hourly retention cleanup (deleting samples >24h, aggregates >6mo)."""
@@ -323,7 +323,7 @@ class LogScopeService:
             except asyncio.CancelledError:
                 break
             except Exception as e:
-                logger.error("Error running retention cleanup: %s", e)
+                logger.error("[Service:Retention] Error running retention cleanup: %s", e, exc_info=True)
 
     def get_telemetry(self) -> TelemetryMetrics:
         """Collects live telemetry for dashboard display."""

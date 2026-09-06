@@ -1,0 +1,72 @@
+name: Oracle Cloud Infrastructure (Terraform)
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'Terraform Action to execute'
+        required: true
+        default: 'apply'
+        type: choice
+        options:
+          - apply
+          - destroy
+
+concurrency:
+  group: oracle-infrastructure
+  cancel-in-progress: false
+
+jobs:
+  terraform:
+    name: Terraform ${{ github.event.inputs.action || 'apply' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.7.5"
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: deploy/oracle/terraform
+        run: terraform init
+
+      - name: Terraform Apply (Create / Update VM)
+        if: ${{ github.event.inputs.action == 'apply' || github.event_name != 'workflow_dispatch' }}
+        working-directory: deploy/oracle/terraform
+        env:
+          TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+          TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
+          TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+          TF_VAR_private_key: ${{ secrets.OCI_PRIVATE_KEY }}
+          TF_VAR_region: ${{ secrets.OCI_REGION }}
+          TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+          TF_VAR_repository_url: https://github.com/${{ github.repository }}.git
+          TF_VAR_logscope_domain: ${{ secrets.LOGSCOPE_DOMAIN }}
+          TF_VAR_openai_secret_ocid: ${{ secrets.OPENAI_SECRET_OCID }}
+          TF_VAR_gemini_secret_ocid: ${{ secrets.GEMINI_SECRET_OCID }}
+          TF_VAR_nvidia_secret_ocid: ${{ secrets.NVIDIA_SECRET_OCID }}
+        run: |
+          terraform apply -auto-approve
+          echo "=== INFRASTRUCTURE OUTPUTS ==="
+          terraform output
+
+      - name: Terraform Destroy (Terminate VM & Teardown)
+        if: ${{ github.event.inputs.action == 'destroy' }}
+        working-directory: deploy/oracle/terraform
+        env:
+          TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+          TF_VAR_user_ocid: ${{ secrets.OCI_USER_OCID }}
+          TF_VAR_fingerprint: ${{ secrets.OCI_FINGERPRINT }}
+          TF_VAR_private_key: ${{ secrets.OCI_PRIVATE_KEY }}
+          TF_VAR_region: ${{ secrets.OCI_REGION }}
+          TF_VAR_compartment_ocid: ${{ secrets.OCI_COMPARTMENT_OCID }}
+          TF_VAR_ssh_public_key: ${{ secrets.OCI_SSH_PUBLIC_KEY }}
+        run: |
+          echo "Terminating VM and destroying infrastructure..."
+          terraform destroy -auto-approve

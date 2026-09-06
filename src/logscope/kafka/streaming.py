@@ -52,6 +52,7 @@ class KafkaStreamManager:
         try:
             from kafka import KafkaProducer
 
+            logger.info("[Kafka] Connecting to Kafka cluster at %s (client_id=%s)...", self.settings.kafka_bootstrap_servers, self.settings.kafka_client_id)
             self.producer = await asyncio.to_thread(
                 KafkaProducer,
                 bootstrap_servers=self.settings.kafka_bootstrap_servers.split(","),
@@ -64,10 +65,11 @@ class KafkaStreamManager:
             )
             await self._ensure_topics()
             self._connected_kafka = True
-            logger.info("Connected to Kafka at %s", self.settings.kafka_bootstrap_servers)
+            logger.info("[Kafka] Successfully connected to Kafka cluster at %s", self.settings.kafka_bootstrap_servers)
         except Exception as exc:
             self.producer = None
             self._connected_kafka = False
+            logger.error("[Kafka] Connection failure: unable to connect to %s: %s", self.settings.kafka_bootstrap_servers, exc)
             raise RuntimeError(
                 "Kafka is required when LOGSCOPE_KAFKA_EMBEDDED_FALLBACK=false; "
                 f"unable to connect to {self.settings.kafka_bootstrap_servers}: {exc}"
@@ -104,6 +106,12 @@ class KafkaStreamManager:
                 ]
                 if missing:
                     admin.create_topics(new_topics=missing, validate_only=False)
+                    logger.info("[Kafka:Admin] Created missing topics: %s", [t.name for t in missing])
+                else:
+                    logger.debug("[Kafka:Admin] All required topics verified: %s", topic_names)
+            except Exception as e:
+                logger.error("[Kafka:Admin] Error creating topics on %s: %s", self.settings.kafka_bootstrap_servers, e)
+                raise
             finally:
                 admin.close()
 
@@ -115,26 +123,32 @@ class KafkaStreamManager:
             try:
                 await asyncio.to_thread(consumer.close)
             except Exception:
-                logger.debug("Kafka consumer close failed", exc_info=True)
+                logger.debug("[Kafka:Consumer] Consumer close failed", exc_info=True)
         self._consumers.clear()
         if self.producer is not None:
             try:
                 await asyncio.to_thread(self.producer.flush, 5)
                 await asyncio.to_thread(self.producer.close)
             except Exception:
-                logger.debug("Kafka producer close failed", exc_info=True)
+                logger.debug("[Kafka:Producer] Producer close failed", exc_info=True)
         self.producer = None
         self._connected_kafka = False
+        logger.info("[Kafka] Stream manager stopped.")
 
     async def _publish(self, topic: str, key: Optional[str], payload: Dict[str, Any]) -> None:
         if not self._connected_kafka or self.producer is None:
+            logger.error("[Kafka:Publish] Cannot publish to topic '%s': Kafka producer is not connected.", topic)
             raise RuntimeError("Kafka producer is not connected")
 
         def send() -> None:
             future = self.producer.send(topic, key=key, value=payload)
             future.get(timeout=5)
 
-        await asyncio.to_thread(send)
+        try:
+            await asyncio.to_thread(send)
+        except Exception as exc:
+            logger.error("[Kafka:Publish] Failed to publish message to topic '%s' (key=%s): %s", topic, key, exc)
+            raise
 
     async def publish_observation(self, observation: SanitizedObservation) -> bool:
         self.total_published += 1
@@ -259,6 +273,7 @@ class KafkaStreamManager:
     ) -> None:
         from kafka import KafkaConsumer
 
+        logger.info("[Kafka:Consumer:%s] Initializing consumer for topic '%s'...", group_id, topic)
         consumer = await asyncio.to_thread(
             KafkaConsumer,
             topic,
@@ -270,6 +285,7 @@ class KafkaStreamManager:
             consumer_timeout_ms=1000,
         )
         self._consumers.append(consumer)
+        logger.info("[Kafka:Consumer:%s] Active and polling topic '%s'", group_id, topic)
         try:
             while not self._stopped.is_set():
                 records = await asyncio.to_thread(consumer.poll, timeout_ms=1000, max_records=100)
@@ -278,9 +294,12 @@ class KafkaStreamManager:
                 processed = 0
                 for messages in records.values():
                     for message in messages:
-                        payload = model.model_validate(message.value)
-                        await handler(payload)
-                        processed += 1
+                        try:
+                            payload = model.model_validate(message.value)
+                            await handler(payload)
+                            processed += 1
+                        except Exception as item_err:
+                            logger.error("[Kafka:Consumer:%s] Failed to process message from topic '%s': %s", group_id, topic, item_err, exc_info=True)
                 if processed:
                     await asyncio.to_thread(consumer.commit)
                 self.consumer_lag = await asyncio.to_thread(self._consumer_lag, consumer)
@@ -289,8 +308,9 @@ class KafkaStreamManager:
                 self._consumers.remove(consumer)
             try:
                 await asyncio.to_thread(consumer.close)
+                logger.info("[Kafka:Consumer:%s] Closed consumer for topic '%s'", group_id, topic)
             except Exception:
-                logger.debug("Kafka consumer close failed", exc_info=True)
+                logger.debug("[Kafka:Consumer:%s] Consumer close failed", group_id, exc_info=True)
 
     async def _consume_kafka_raw_topic(
         self,
@@ -312,6 +332,7 @@ class KafkaStreamManager:
             except Exception:
                 return raw_bytes.decode("utf-8", errors="replace"), {}
 
+        logger.info("[Kafka:RawConsumer:%s] Initializing raw log consumer for topic '%s'...", group_id, topic)
         consumer = await asyncio.to_thread(
             KafkaConsumer,
             topic,
@@ -323,6 +344,7 @@ class KafkaStreamManager:
             consumer_timeout_ms=1000,
         )
         self._consumers.append(consumer)
+        logger.info("[Kafka:RawConsumer:%s] Active and polling topic '%s'", group_id, topic)
         try:
             while not self._stopped.is_set():
                 records = await asyncio.to_thread(consumer.poll, timeout_ms=1000, max_records=100)
@@ -331,9 +353,12 @@ class KafkaStreamManager:
                 processed = 0
                 for messages in records.values():
                     for message in messages:
-                        raw_line, meta = message.value
-                        await handler(raw_line, meta)
-                        processed += 1
+                        try:
+                            raw_line, meta = message.value
+                            await handler(raw_line, meta)
+                            processed += 1
+                        except Exception as item_err:
+                            logger.error("[Kafka:RawConsumer:%s] Failed to process raw line from topic '%s': %s", group_id, topic, item_err, exc_info=True)
                 if processed:
                     await asyncio.to_thread(consumer.commit)
                 self.consumer_lag = await asyncio.to_thread(self._consumer_lag, consumer)
@@ -342,8 +367,9 @@ class KafkaStreamManager:
                 self._consumers.remove(consumer)
             try:
                 await asyncio.to_thread(consumer.close)
+                logger.info("[Kafka:RawConsumer:%s] Closed consumer for topic '%s'", group_id, topic)
             except Exception:
-                logger.debug("Kafka raw consumer close failed", exc_info=True)
+                logger.debug("[Kafka:RawConsumer:%s] Raw consumer close failed", group_id, exc_info=True)
 
     @staticmethod
     def _consumer_lag(consumer: Any) -> int:

@@ -22,6 +22,9 @@ logs/**/*.log
 .agent-memory/
 .mypy_cache/
 .ruff_cache/
+# Graphify generated artifacts
+graphify*
+.graphify*
 dist/
 build/
 *.egg-info/

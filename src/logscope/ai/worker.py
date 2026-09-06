@@ -172,9 +172,10 @@ class AIAnalysisWorker:
                     model=handle.embedding_model,
                     input=text,
                 )
+                logger.debug("[AI:%s] Created vector embedding using model %s", handle.name.upper(), handle.embedding_model)
                 return list(response.data[0].embedding)
             except Exception as exc:
-                logger.error("Embedding request failed via %s: %s", handle.name, exc)
+                logger.warning("[AI:%s] Embedding request failed via model %s: %s", handle.name.upper(), handle.embedding_model, exc)
         return None
 
     async def analyze_batch(self, anomalies: List[AnomalyRecord]) -> List[AIAnalysisResult]:
@@ -258,7 +259,9 @@ class AIAnalysisWorker:
 
         if self.providers:
             for handle in self.providers:
+                prov_tag = handle.name.upper()
                 try:
+                    logger.info("[AI:%s] Requesting SRE triage for anomaly %s with model %s...", prov_tag, anomaly.id, handle.model)
                     response = await handle.client.chat.completions.create(
                         model=handle.model,
                         messages=[
@@ -315,17 +318,20 @@ class AIAnalysisWorker:
                     self.active_provider = handle.name
                     self.active_model = handle.model
                     self.client = handle.client
+                    logger.info("[AI:%s] Successfully completed triage for anomaly %s in %dms (Severity: %s, Confidence: %s)", prov_tag, anomaly.id, elapsed, sev.value, conf.value)
                     break
                 except Exception as e:
                     last_error = f"{handle.name}: {e}"
-                    logger.error("LLM analysis failed via %s: %s", handle.name, e)
+                    logger.warning("[AI:%s] Triage request failed for anomaly %s with model %s: %s. Attempting fallback...", prov_tag, anomaly.id, handle.model, e)
                     continue
 
             if analysis_result is None:
+                logger.warning("[AI:Fallback] All configured AI providers failed (%s). Triggering local heuristic SRE triage.", last_error)
                 analysis_result = self._fallback_heuristic_triage(anomaly, past_resolutions=past_resolutions)
                 analysis_result.error = last_error or "All LLM providers failed"
                 analysis_result.is_retryable = True
         else:
+            logger.info("[AI:Heuristic] No external LLM providers configured; running local heuristic SRE triage for anomaly %s.", anomaly.id)
             analysis_result = self._fallback_heuristic_triage(anomaly, past_resolutions=past_resolutions)
 
         # Save to database
@@ -366,6 +372,7 @@ class AIAnalysisWorker:
             context_bullets.append(
                 f"- Active Anomaly [{anom['application']}]: {anom['template_text']} (Count: {anom['current_count']}, Severity: {anom.get('severity', 'N/A')})"
             )
+
         for sim in similar_events:
             context_bullets.append(f"- Historical Record: {sim['text_content']} (Similarity: {sim['score']})")
 
@@ -374,7 +381,9 @@ class AIAnalysisWorker:
         if self.providers:
             last_error: Optional[str] = None
             for handle in self.providers:
+                prov_tag = handle.name.upper()
                 try:
+                    logger.info("[AI:%s] Processing Ask AI query with model %s...", prov_tag, handle.model)
                     resp = await handle.client.chat.completions.create(
                         model=handle.model,
                         messages=[
@@ -399,6 +408,7 @@ class AIAnalysisWorker:
                     self.active_provider = handle.name
                     self.active_model = handle.model
                     self.client = handle.client
+                    logger.info("[AI:%s] Successfully generated answer for user query using %s", prov_tag, handle.model)
                     return {
                         "answer": answer,
                         "sources": similar_events,
@@ -407,8 +417,9 @@ class AIAnalysisWorker:
                     }
                 except Exception as e:
                     last_error = f"{handle.name}: {e}"
-                    logger.error("Ask AI failed via %s: %s", handle.name, e)
+                    logger.warning("[AI:%s] Ask AI request failed via model %s: %s", prov_tag, handle.model, e)
                     continue
+            logger.warning("[AI:AskAI] All LLM providers failed (%s). Falling back to local heuristic response.", last_error)
             return {
                 "answer": (
                     f"Unable to reach LLM providers ({last_error}). "

@@ -1,6 +1,7 @@
 """SQLite Async Storage Layer with WAL mode and repository functions."""
 
 import json
+import logging
 import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
@@ -11,6 +12,8 @@ from logscope.models import (
     SourceConfig, TemplateRecord, TemplateBucket, AnomalyRecord,
     AIAnalysisResult, FeedbackRecord, SanitizedObservation, AnomalyStatus
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _adapt_datetime_iso(val: datetime) -> str:
@@ -232,12 +235,17 @@ class Database:
 
     async def initialize(self):
         """Creates parent directories, applies schema, and sets WAL mode."""
-        self.db_path.parent.mkdir(parents=True, exist_ok=True)
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.executescript(SCHEMA_SQL)
-            await self._apply_compatible_migrations(db)
-            await db.commit()
-        self._initialized = True
+        try:
+            self.db_path.parent.mkdir(parents=True, exist_ok=True)
+            async with aiosqlite.connect(self.db_path) as db:
+                await db.executescript(SCHEMA_SQL)
+                await self._apply_compatible_migrations(db)
+                await db.commit()
+            self._initialized = True
+            logger.info("[Database:SQLite] Successfully initialized database at %s with WAL mode", self.db_path)
+        except Exception as e:
+            logger.error("[Database:SQLite] Failed to initialize SQLite database at %s: %s", self.db_path, e, exc_info=True)
+            raise
 
     async def _apply_compatible_migrations(self, db: aiosqlite.Connection) -> None:
         """Additive migrations keep existing local POC databases usable."""
@@ -581,6 +589,7 @@ class Database:
         sample_cutoff = now - timedelta(hours=sample_retention_hours)
         aggregate_cutoff = now - timedelta(days=aggregate_retention_months * 30)
 
+        logger.info("[Database:Retention] Running retention cleanup (sample_hours=%d, aggregate_months=%d)...", sample_retention_hours, aggregate_retention_months)
         async with self.get_connection() as db:
             # Delete expired samples
             cursor1 = await db.execute("DELETE FROM samples WHERE expires_at < ? OR created_at < ?", (now, sample_cutoff))
@@ -617,6 +626,11 @@ class Database:
 
             cursor_templates = await db.execute("DELETE FROM templates WHERE last_seen < ?", (aggregate_cutoff,))
             templates_deleted = cursor_templates.rowcount
+
+            logger.info(
+                "[Database:Retention] Cleanup completed: deleted %d samples, %d analyses, %d embeddings, %d anomalies, %d buckets, %d templates",
+                samples_deleted, analyses_deleted, embeddings_deleted, anomalies_deleted, buckets_deleted, templates_deleted
+            )
 
             # Log retention run
             import uuid
