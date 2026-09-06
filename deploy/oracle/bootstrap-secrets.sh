@@ -22,7 +22,7 @@ OPENAI_SECRET_OCID="${OPENAI_SECRET_OCID:-}"
 GEMINI_SECRET_OCID="${GEMINI_SECRET_OCID:-}"
 
 umask 077
-install -d -o root -g root -m 700 "$SECRETS_DIR"
+install -d -o root -g docker -m 750 "$SECRETS_DIR"
 
 fetch_secret() {
   local name="$1"
@@ -47,7 +47,7 @@ fetch_secret() {
   fi
 
   [[ -s "$temporary" ]] || { echo "[OCI:Vault] ERROR: Secret '$name' content was empty" >&2; return 1; }
-  install -o root -g root -m 600 "$temporary" "$output"
+  install -o root -g docker -m 640 "$temporary" "$output"
   rm -f "$temporary"
   trap - RETURN
   echo "[OCI:Vault] Successfully retrieved and stored secret '$name'"
@@ -79,7 +79,7 @@ chmod 600 "$temporary_env"
     printf 'GEMINI_API_KEY=%s\n' "$(<"$SECRETS_DIR/GEMINI_API_KEY")"
   fi
 } > "$temporary_env"
-install -o root -g root -m 600 "$temporary_env" "$env_file"
+install -o root -g docker -m 640 "$temporary_env" "$env_file"
 rm -f "$temporary_env"
 trap - EXIT
 
