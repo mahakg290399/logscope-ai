@@ -207,3 +207,10 @@
 - **Discovery**: `Whitepaper` badge link placed directly beside the `v2.0` badge in the navbar; both link back and forth (`/` ↔ `/whitepaper`).
 - **UI modernization** (same panels, same data): electric-violet `indigo` remap + deepened `slate` surfaces via `tailwind.config`, aurora-gradient body, glass cards with glow hover, gradient logo block, timeline volume line cyan (`#22d3ee`).
 - **Verification**: 34/34 tests pass (added `/whitepaper` 200 + content assertions to `tests/test_api.py`); local + Oracle `docker compose config` clean.
+
+## Session 14: Whitepaper Figures, Deployment-Stack Rewrite & Locked Prompts
+- **Date**: 2026-09-06
+- Replaced the two broken dashed placeholder boxes with hand-built inline SVG visuals (Fig 1: log-volume → template compression with pulsing new-error marker; Fig 2: timeline mock with pulsing error-burst callout) — they render with zero external dependencies.
+- Renamed §6 `Production path` → `Current deployment stack` (live OCI topology table: compute/network/stack/secrets/pipeline, $0 Always Free); future items moved to new §7 `Production hardening (open questions)`; verification → §8, prompts → §9.
+- Rewrote §9 prompts as theme-locked: every prompt appends a fixed style block (exact hexes `#070b1a`/`#22d3ee`/`#8b5cf6`/`#fb7185`/`#34d399`, glassmorphism, no readable sentences/logos/watermarks) plus aspect ratios and a screenshot-overlay tip.
+- **Verification**: 34/34 tests pass; pushed as `4bc6f35`, CD redeploying to `logscope.freengineer.me/whitepaper`.
