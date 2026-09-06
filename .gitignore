@@ -5,6 +5,7 @@
 # OCI deployment runtime secrets
 deploy/oracle/.env.runtime
 deploy/oracle/secrets/
+deploy/oracle/deployment.local.env
 # Ephemeral CI dummy runtime file (created by .github/workflows/ci.yml)
 secrets/
 *.oci-config
