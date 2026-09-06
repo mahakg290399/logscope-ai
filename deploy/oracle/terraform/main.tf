@@ -147,4 +147,10 @@ resource "oci_core_instance" "logscope_vm" {
       nvidia_secret_ocid = var.nvidia_secret_ocid
     }))
   }
+
+  # Bootstrap is managed by cloud-init/CD after the VM exists. Changing these
+  # values must not force Terraform to replace a running production VM.
+  lifecycle {
+    ignore_changes = [metadata]
+  }
 }
