@@ -51,7 +51,7 @@
   <main class="max-w-4xl mx-auto px-4 sm:px-6 py-10 prose-paper">
     <p class="kicker">Technical whitepaper</p>
     <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-2">LogScope AI <span class="bg-gradient-to-r from-cyan-300 to-violet-400 bg-clip-text text-transparent">v2.0</span></h1>
-    <p class="mt-2 text-slate-400 text-sm">SRE log aggregation, deterministic anomaly detection &amp; AI incident triage &mdash; problem, architecture, tooling, dashboard guide and production path. Last updated 2026-09-06. Live system: <code>logscope.freengineer.me</code>.</p>
+    <p class="mt-2 text-slate-400 text-sm">SRE log aggregation, deterministic anomaly detection &amp; AI incident triage &mdash; problem, architecture, tooling, dashboard guide, current deployment stack and hardening path. Last updated 2026-09-06. Live system: <code>logscope.freengineer.me</code>.</p>
 
     <h2>1. The problem we solve</h2>
     <p>Modern services emit thousands of log lines per second across multiple files, hosts and formats. Engineers face four pains:</p>
@@ -62,7 +62,36 @@
       <li><strong class="text-slate-100">Unsafe AI shortcuts</strong> &mdash; pasting raw logs into an LLM leaks passwords, tokens, emails and customer IDs.</li>
     </ol>
     <p>LogScope treats logs as an <em>application heartbeat</em>: compress repetition into templates, watch the pulse for arrhythmia with deterministic rules, and call the LLM only as a triage copilot over sanitized, bounded evidence.</p>
-    <div class="fig"><i class="fa-solid fa-image text-2xl mb-2 block"></i>FIGURE 1 &mdash; The log-volume problem. Generate with prompt P1 in &sect;8, or screenshot the live timeline chart.</div>
+    <figure class="glass rounded-xl p-4 my-4">
+    <svg viewBox="0 0 720 220" class="w-full" role="img" aria-label="Log volume压缩 into templates illustration">
+      <g font-family="monospace" font-size="10">
+        <text x="12" y="18" fill="#7d8aa5">raw stream: 1,000+ lines/sec, mostly repetition</text>
+        <g>
+          <rect x="12" y="30" width="250" height="10" rx="5" fill="#1c2942"/><rect x="12" y="44" width="250" height="10" rx="5" fill="#1c2942"/>
+          <rect x="12" y="58" width="250" height="10" rx="5" fill="#1c2942"/><rect x="12" y="72" width="250" height="10" rx="5" fill="#1c2942"/>
+          <rect x="12" y="86" width="250" height="10" rx="5" fill="#3d1a26"/>
+          <rect x="12" y="86" width="250" height="10" rx="5" fill="none" stroke="#fb7185" stroke-width="1.5"/>
+          <circle cx="252" cy="91" r="4" fill="#fb7185"><animate attributeName="opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/></circle>
+          <rect x="12" y="100" width="250" height="10" rx="5" fill="#1c2942"/><rect x="12" y="114" width="250" height="10" rx="5" fill="#1c2942"/>
+          <rect x="12" y="128" width="250" height="10" rx="5" fill="#1c2942"/><rect x="12" y="142" width="250" height="10" rx="5" fill="#1c2942"/>
+          <rect x="12" y="156" width="250" height="10" rx="5" fill="#1c2942"/><rect x="12" y="170" width="250" height="10" rx="5" fill="#1c2942"/>
+          <rect x="12" y="184" width="250" height="10" rx="5" fill="#1c2942"/>
+        </g>
+        <text x="137" y="91" fill="#fda4af">1 new error buried in repetition</text>
+        <path d="M275 110 L330 110" stroke="#67e8f9" stroke-width="2"/>
+        <path d="M322 102 L332 110 L322 118" fill="none" stroke="#67e8f9" stroke-width="2"/>
+        <text x="303" y="100" fill="#67e8f9" text-anchor="middle">Drain3</text>
+        <rect x="345" y="34" width="363" height="40" rx="8" fill="#0f2a1d" stroke="#34d399"/>
+        <text x="358" y="58" fill="#d1fae5">User &lt;EMAIL&gt; logged in from &lt;IP&gt; &#215; 41,208</text>
+        <rect x="345" y="82" width="363" height="40" rx="8" fill="#0f2a1d" stroke="#34d399"/>
+        <text x="358" y="106" fill="#d1fae5">Payment intent created for order &lt;NUM&gt; &#215; 18,944</text>
+        <rect x="345" y="130" width="363" height="40" rx="8" fill="#3d1a26" stroke="#fb7185"/>
+        <text x="358" y="154" fill="#fecdd3">Gateway timeout on &lt;PROVIDER&gt; &#215; 312 &#8593; NEW</text>
+        <text x="345" y="192" fill="#7d8aa5">3 templates stand in for 60,000+ lines</text>
+      </g>
+    </svg>
+    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 1 &mdash; Repetition compressed into templates; the novel error surfaces automatically.</figcaption>
+    </figure>
 
     <h2>2. Design principles</h2>
     <ul>
@@ -150,7 +179,27 @@
     </ul>
     <h3>5-Minute Ingestion Volume &amp; Anomaly Timeline</h3>
     <p>Chart.js chart of bucketed observation volume (cyan) overlaid with error spikes (rose), fed by <code>/api/buckets/timeline</code>. Refresh icon reloads on demand; it answers &ldquo;did anything just change?&rdquo; at a glance.</p>
-    <div class="fig"><i class="fa-solid fa-image text-2xl mb-2 block"></i>FIGURE 2 &mdash; Timeline chart. Generate with prompt P2 in &sect;8, or screenshot the live chart.</div>
+    <figure class="glass rounded-xl p-4 my-4">
+    <svg viewBox="0 0 720 250" class="w-full" role="img" aria-label="Timeline chart illustration">
+      <g font-family="monospace" font-size="10">
+        <text x="12" y="18" fill="#7d8aa5">5-minute buckets &mdash; observation volume (cyan) + error spikes (rose)</text>
+        <g stroke="rgba(148,163,184,.15)"><line x1="44" y1="40" x2="44" y2="200"/><line x1="44" y1="200" x2="700" y2="200"/>
+          <line x1="44" y1="160" x2="700" y2="160"/><line x1="44" y1="120" x2="700" y2="120"/><line x1="44" y1="80" x2="700" y2="80"/></g>
+        <path d="M44,180 L120,172 L200,176 L280,168 L360,150 L430,158 L470,90 L510,140 L590,170 L660,166 L700,170 L700,200 L44,200 Z" fill="rgba(34,211,238,.18)"/>
+        <path d="M44,180 L120,172 L200,176 L280,168 L360,150 L430,158 L470,90 L510,140 L590,170 L660,166 L700,170" fill="none" stroke="#22d3ee" stroke-width="2.5"/>
+        <rect x="458" y="96" width="24" height="104" rx="3" fill="rgba(251,113,133,.55)"/>
+        <circle cx="470" cy="90" r="5" fill="#fb7185"><animate attributeName="opacity" values="1;.3;1" dur="1.6s" repeatCount="indefinite"/></circle>
+        <circle cx="470" cy="90" r="10" fill="none" stroke="#fb7185" stroke-width="1"/>
+        <text x="470" y="76" fill="#fda4af" text-anchor="middle">ERROR BURST &#215;312</text>
+        <text x="470" y="216" fill="#7d8aa5" text-anchor="middle">14:05</text>
+        <text x="200" y="216" fill="#475569" text-anchor="middle">13:50</text>
+        <text x="660" y="216" fill="#475569" text-anchor="middle">14:20</text>
+        <rect x="500" y="30" width="12" height="12" rx="3" fill="rgba(34,211,238,.4)" stroke="#22d3ee"/><text x="518" y="40" fill="#a5f3fc">Total observations</text>
+        <rect x="500" y="48" width="12" height="12" rx="3" fill="rgba(251,113,133,.4)" stroke="#fb7185"/><text x="518" y="58" fill="#fecdd3">Error spikes</text>
+      </g>
+    </svg>
+    <figcaption class="text-center text-xs text-slate-500 mt-2">Figure 2 &mdash; The 5-minute timeline: steady heartbeat, one arrhythmia worth triaging.</figcaption>
+    </figure>
     <h3>Active Anomalies + filters</h3>
     <p>Each card carries an <code>INC</code> + 7-digit incident number, severity (Sev-0 critical &hellip; Sev-4 info), confidence (very-low&hellip;very-high), AI summary, evidence (template IDs, counts, source path/line), possible causes and recommended actions. The auto-refresh dropdown (5s/10s/30s/60s/Off) plus manual Refresh control polling; severity/application/environment/source filters narrow the feed. Empty state (&ldquo;All Services Operating Normally&rdquo;) confirms detectors ran and found nothing &mdash; distinct from a disconnected stream.</p>
     <h3>Dismissed Anomalies Archive</h3>
@@ -164,10 +213,19 @@
     <h3>Mined Templates + drill-down modal</h3>
     <p>Template browser; per-template drill-down shows the pattern, founding sample message, 5-minute bucket rollup history table and bounded sanitized evidence samples &mdash; the full audit trail from pulse to verdict.</p>
 
-    <h2>6. Production path</h2>
-    <h3>Running today (OCI Always Free)</h3>
-    <p>Single Ampere A1 VM (2 OCPU / 12 GB, Terraform-managed, reserved IP) running Kafka + app + demo workload + Caddy for <code>https://logscope.freengineer.me</code>. Secrets in OCI Vault via instance principal; deploys via GitHub Actions (<code>infra.yml</code> for infrastructure, <code>cd.yml</code> for code). $0/month inside Always Free limits.</p>
-    <h3>To production-grade</h3>
+    <h2>6. Current deployment stack</h2>
+    <p>LogScope runs today as a single <strong class="text-slate-100">Oracle Always Free</strong> Ampere A1 VM (2 OCPU / 12 GB, Terraform-managed, reserved public IP) hosting Kafka, the app, the demo workload generator and Caddy edge proxy for <code>https://logscope.freengineer.me</code>. LLM secrets live in OCI Vault and are refreshed on the VM via instance principal &mdash; they never appear in git, images or CI. Two GitHub Actions workflows operate it: <code>infra.yml</code> (infrastructure apply/destroy) and <code>cd.yml</code> (pull, native-ARM rebuild, health-gated at <code>/api/health</code>). Total cost: <strong class="text-slate-100">$0/month</strong> inside Always Free limits (200 GB disk, 10 TB egress).</p>
+    <table>
+      <tr><th>Piece</th><th>What runs</th><th>Notes</th></tr>
+      <tr><td>Compute</td><td>1&times; VM.Standard.A1.Flex, Ubuntu 24.04 ARM</td><td>Terraform state in OCI Object Storage; live VM imported, replacement-guarded</td></tr>
+      <tr><td>Network</td><td>VCN + public subnet, 80/443 open, SSH key-only</td><td>Reserved public IP survives restarts &mdash; no DNS churn</td></tr>
+      <tr><td>Stack</td><td>Kafka KRaft + LogScope + demo-app + Caddy</td><td><code>deploy/oracle/docker-compose.production.yml</code></td></tr>
+      <tr><td>Secrets</td><td>Vault: OpenAI / Gemini / NVIDIA keys</td><td>OCIDs on VM only; values pulled at deploy time</td></tr>
+      <tr><td>Pipeline</td><td>CI pytest+compose, CD over SSH</td><td><code>production</code> environment-gated</td></tr>
+    </table>
+
+    <h2>7. Production hardening (open questions)</h2>
+    <p>Beyond the current stack, these take it production-grade. Defaults proposed; final calls pending review:</p>
     <table>
       <tr><th>Topic</th><th>Direction</th><th>Status</th></tr>
       <tr><td>Authentication</td><td>SSO (GitHub/Google) in front of dashboard; single-user mode ends</td><td>Open &mdash; provider choice pending</td></tr>
@@ -180,18 +238,20 @@
     </table>
     <div class="open-q"><p><i class="fa-solid fa-circle-question mr-1"></i>Open production questions for review: SSO provider? Alert channels? Second-VM trigger? Which steady log source? Answers get recorded in <code>docs/DECISIONS.md</code>.</p></div>
 
-    <h2>7. Verification snapshot</h2>
+    <h2>8. Verification snapshot</h2>
     <p>34/34 tests passing; ~1,000+ lines/sec sustained with zero drops (benchmark); <code>/api/health</code> 200 in production. Acceptance criteria trace to <code>PRD.md</code> &sect;20.</p>
 
-    <h2>8. Image generation prompts</h2>
-    <p>Use these with an image-capable model to produce the whitepaper figures (dark SRE-console style, cyan/violet on deep navy):</p>
+    <h2>9. Image generation prompts (theme-locked)</h2>
+    <p>Figures 1&ndash;3 above are hand-built inline SVG so they always render. For cover art or slides, use these prompts. <strong class="text-slate-100">Append this style block to every prompt</strong> so output matches the LogScope theme:</p>
+    <p><code>Style: dark SRE-console aesthetic, deep navy background #070b1a, glowing cyan #22d3ee + electric violet #8b5cf6 accents, rose #fb7185 reserved for errors, emerald #34d399 for healthy states, glassmorphism panels, subtle grid, monospace micro-labels allowed but NO readable sentences, NO logos, NO watermarks.</code></p>
     <ul>
-      <li><strong class="text-slate-100">P1 &mdash; problem:</strong> &ldquo;Dark operations-center illustration: engineer silhouette before a wall of monitors drowning in green log text, one red error line glowing; cinematic, navy background, cyan and violet accents, no readable text.&rdquo;</li>
-      <li><strong class="text-slate-100">P2 &mdash; dashboard mock:</strong> &ldquo;Dark-mode SRE dashboard UI mockup: KPI cards row, cyan area chart with red spike overlay, incident cards with severity badges, AI chat panel; sleek glassmorphism, deep navy, cyan/violet glow, 16:9.&rdquo;</li>
-      <li><strong class="text-slate-100">P3 &mdash; pipeline:</strong> &ldquo;Horizontal data-pipeline diagram, dark theme: file icons &rarr; shield (sanitize) &rarr; clustered templates &rarr; Kafka stream &rarr; chart buckets &rarr; robot analyst &rarr; dashboard; glowing cyan connectors, violet nodes.&rdquo;</li>
-      <li><strong class="text-slate-100">P4 &mdash; deployment:</strong> &ldquo;Cloud deployment topology on dark canvas: GitHub box pushing to Oracle Cloud VM box containing Kafka, app, Caddy containers, vault icon beside it, HTTPS arrow to a browser showing a dashboard; minimal, cyan/violet.&rdquo;</li>
-      <li><strong class="text-slate-100">P5 &mdash; triage:</strong> &ldquo;Close-up of AI incident triage card UI: severity badge Sev-1, confidence meter, evidence list, recommended actions; dark glass card, red/amber accents, ultra clean.&rdquo;</li>
+      <li><strong class="text-slate-100">P1 &mdash; problem cover (16:9):</strong> &ldquo;Operations-center wall of monitors drowning in scrolling green log text, a single glowing rose-red error line pulsing among them, lone engineer silhouette in foreground. Cinematic wide shot, shallow depth of field.&rdquo; + style block.</li>
+      <li><strong class="text-slate-100">P2 &mdash; dashboard hero (16:9):</strong> &ldquo;Dark-mode SRE dashboard UI: four glass KPI cards on top, large cyan area chart with one rose spike annotation, incident cards with Sev-0&hellip;Sev-4 badges left, AI chat panel right. Clean layout, generous spacing, glowing accents.&rdquo; + style block.</li>
+      <li><strong class="text-slate-100">P3 &mdash; pipeline diagram (3:1 wide):</strong> &ldquo;Horizontal data pipeline of seven rounded glass nodes connected by glowing cyan lines: log files &rarr; shield &rarr; clustered templates &rarr; streaming hub &rarr; bar-chart buckets &rarr; robot analyst &rarr; dashboard screen. Violet node fill, left-to-right flow.&rdquo; + style block.</li>
+      <li><strong class="text-slate-100">P4 &mdash; deployment topology (16:9):</strong> &ldquo;Cloud topology: code-host box top-left pushing glowing arrows into an Oracle Cloud region box containing one VM with four stacked containers (streaming, app, edge proxy, demo load), vault/safe icon beside it, HTTPS arrow to a browser window with dashboard. Minimal labels as icons only.&rdquo; + style block.</li>
+      <li><strong class="text-slate-100">P5 &mdash; triage card close-up (4:3):</strong> &ldquo;Macro shot of a single AI incident triage glass card: rose Sev-1 badge, five-dot confidence meter, evidence rows, recommended-action checklist, incident number INC-0000001. Ultra-clean, dramatic rim light.&rdquo; + style block.</li>
     </ul>
+    <p class="text-slate-500 text-xs mt-2">Tip: generate at 2x, downscale, and overlay real screenshots (dashboard, timeline) for Figures 1&ndash;2 if photographic fidelity is preferred over illustration.</p>
 
     <footer class="mt-12 pt-6 border-t border-slate-800/80 text-xs text-slate-500 flex items-center justify-between">
       <span>LogScope AI v2.0 whitepaper &mdash; generated from the live codebase.</span>
