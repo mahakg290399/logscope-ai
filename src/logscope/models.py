@@ -12,6 +12,7 @@ class LogLevel(str, Enum):
     TRACE = "TRACE"
     DEBUG = "DEBUG"
 import uuid
+import secrets
 
 
 class LogLevel(str, Enum):
@@ -149,6 +150,7 @@ class TemplateBucket(BaseModel):
 
 class AnomalyRecord(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    incident_number: str = Field(default_factory=lambda: f"INC{secrets.randbelow(10_000_000):07d}")
     application: str
     environment: str
     template_id: str

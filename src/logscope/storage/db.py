@@ -137,6 +137,7 @@ CREATE INDEX IF NOT EXISTS idx_samples_expires ON samples(expires_at);
 
 CREATE TABLE IF NOT EXISTS anomalies (
     id TEXT PRIMARY KEY,
+    incident_number TEXT UNIQUE,
     application TEXT NOT NULL,
     environment TEXT NOT NULL,
     template_id TEXT NOT NULL,
@@ -251,6 +252,7 @@ class Database:
         """Additive migrations keep existing local POC databases usable."""
         migrations = {
             "anomalies": {
+                "incident_number": "TEXT",
                 "related_template_ids": "TEXT",
                 "evidence_references": "TEXT",
                 "detector_version": "TEXT NOT NULL DEFAULT 'v1'",
@@ -272,6 +274,18 @@ class Database:
             for name, definition in columns.items():
                 if name not in existing:
                     await db.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+            if table == "anomalies" and "incident_number" not in existing:
+                cursor = await db.execute(
+                    "SELECT rowid, id FROM anomalies WHERE incident_number IS NULL ORDER BY rowid"
+                )
+                for sequence, row in enumerate(await cursor.fetchall(), start=1):
+                    await db.execute(
+                        "UPDATE anomalies SET incident_number = ? WHERE rowid = ?",
+                        (f"INC{sequence:07d}", row[0]),
+                    )
+        await db.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_anomalies_incident_number ON anomalies(incident_number)"
+        )
 
     @asynccontextmanager
     async def get_connection(self) -> AsyncGenerator[aiosqlite.Connection, None]:
@@ -457,10 +471,10 @@ class Database:
         async with self.get_connection() as db:
             await db.execute(
                 """
-                INSERT INTO anomalies (id, application, environment, template_id, anomaly_type, detected_at, bucket_start, current_count, baseline_count, z_score, status, template_text, sample_evidence, source_paths, related_template_ids, evidence_references, detector_version, data_loss_warning)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO anomalies (id, incident_number, application, environment, template_id, anomaly_type, detected_at, bucket_start, current_count, baseline_count, z_score, status, template_text, sample_evidence, source_paths, related_template_ids, evidence_references, detector_version, data_loss_warning)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (anomaly.id, anomaly.application, anomaly.environment, anomaly.template_id,
+                (anomaly.id, anomaly.incident_number, anomaly.application, anomaly.environment, anomaly.template_id,
                  anomaly.anomaly_type.value, anomaly.detected_at, anomaly.bucket_start,
                  anomaly.current_count, anomaly.baseline_count, anomaly.z_score,
                  anomaly.status.value, anomaly.template_text,

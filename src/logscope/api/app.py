@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from logscope.config import Settings, get_settings
 from logscope.service import LogScopeService
@@ -32,6 +32,7 @@ class DismissRequest(BaseModel):
 
 class AskAIRequest(BaseModel):
     query: str
+    history: List[Dict[str, str]] = Field(default_factory=list)
 
 
 def create_app(
@@ -224,7 +225,11 @@ def create_app(
     @app.post("/api/ask")
     @app.post("/api/ask-ai")
     async def ask_ai(req: AskAIRequest):
-        res = await service.ai_worker.ask_ai(req.query)
+        history = [
+            item for item in req.history[-20:]
+            if item.get("role") in {"user", "assistant"} and item.get("content")
+        ]
+        res = await service.ai_worker.ask_ai(req.query, history=history)
         return res
 
     @app.get("/api/stream")

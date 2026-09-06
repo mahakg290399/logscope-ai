@@ -167,9 +167,20 @@
             <h2 class="text-lg font-semibold tracking-tight text-white">Active Anomalies</h2>
             <span id="anomaliesBadge" class="px-2 py-0.5 text-xs rounded-full bg-amber-950 text-amber-400 border border-amber-800 font-mono">0</span>
           </div>
-          <button onclick="refreshData()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5">
-            <i class="fa-solid fa-rotate text-slate-400"></i> Refresh
-          </button>
+          <div class="flex items-center gap-2">
+            <label class="text-[11px] text-slate-500">Auto-refresh
+              <select id="refreshIntervalSelect" onchange="setRefreshInterval(this.value)" class="ml-1 rounded bg-slate-900 border border-slate-700 px-2 py-1.5 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none">
+                <option value="5000">5s</option>
+                <option value="10000" selected>10s</option>
+                <option value="30000">30s</option>
+                <option value="60000">60s</option>
+                <option value="0">Off</option>
+              </select>
+            </label>
+            <button onclick="refreshData()" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition flex items-center gap-1.5">
+              <i class="fa-solid fa-rotate text-slate-400"></i> Refresh
+            </button>
+          </div>
         </div>
 
         <!-- Incident Filtering Controls (Phase 5) -->
@@ -233,14 +244,14 @@
       <div class="space-y-6">
 
         <!-- Ask AI Card -->
-        <div class="glass-card rounded-xl p-4 flex flex-col space-y-3">
+        <div class="glass-card rounded-xl p-4 flex flex-col space-y-3" id="aiChatCard">
           <div class="flex items-center gap-2 text-sm font-semibold text-indigo-300">
             <i class="fa-solid fa-sparkles text-indigo-400"></i>
             <span>Ask SRE Copilot</span>
           </div>
           <p class="text-xs text-slate-400">Query log heartbeat, correlations, or root causes across active and historical templates.</p>
           
-          <div class="relative">
+          <div class="relative" id="aiPromptState">
             <textarea id="aiQueryInput" rows="3" placeholder="e.g., Why did auth-service spike in errors? Any connection timeouts?" 
               class="w-full bg-slate-900/90 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"></textarea>
             <button onclick="askAI()" id="btnAskAI" class="mt-2 w-full py-1.5 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition flex items-center justify-center gap-2 shadow shadow-indigo-600/30">
@@ -248,12 +259,15 @@
             </button>
           </div>
 
-          <!-- AI Response Box -->
-          <div id="aiResponseBox" class="hidden mt-2 p-3 rounded-lg bg-slate-900/80 border border-slate-700 text-xs text-slate-300 space-y-2">
-            <div class="font-semibold text-indigo-400 flex items-center gap-1.5">
-              <i class="fa-solid fa-robot"></i> Copilot Analysis:
+          <div id="aiChatState" class="hidden space-y-3">
+            <div id="aiChatMessages" class="max-h-80 overflow-y-auto space-y-3 pr-1"></div>
+            <div class="flex gap-2">
+              <textarea id="aiChatInput" rows="2" placeholder="Ask a follow-up question..."
+                class="min-w-0 flex-1 bg-slate-900/90 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-none font-sans"></textarea>
+              <button onclick="askAI(true)" id="btnChatAsk" class="self-end py-2 px-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-medium transition" aria-label="Send follow-up">
+                <i class="fa-solid fa-paper-plane"></i>
+              </button>
             </div>
-            <div id="aiResponseText" class="leading-relaxed whitespace-pre-wrap"></div>
           </div>
         </div>
 
@@ -386,6 +400,8 @@
     const openDiagnosticIds = new Set();
     let minedTemplates = [];
     let timelineChartInstance = null;
+    let aiHistory = JSON.parse(localStorage.getItem('logscope-ai-chat') || '[]');
+    let refreshTimer = null;
 
     // Severity styling helper
     function getSeverityBadge(sev) {
@@ -699,6 +715,7 @@
               <div class="flex items-center gap-2">
                 ${sevHtml}
                 ${confHtml}
+                <span class="text-xs font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800">${escapeHtml(a.incident_number || 'INC—')}</span>
                 <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-semibold">${escapeHtml(a.application)}</span>
                 <span class="text-xs text-slate-500 font-mono">[${escapeHtml(a.environment)}]</span>
               </div>
@@ -767,6 +784,7 @@
           <div class="flex flex-wrap items-center justify-between gap-2">
             <div class="flex items-center gap-2">
               ${getSeverityBadge(d.severity)}
+              <span class="text-xs font-mono px-2 py-0.5 rounded bg-rose-950/60 text-rose-300 border border-rose-800">${escapeHtml(d.incident_number || 'INC—')}</span>
               <span class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-indigo-300 font-semibold">${escapeHtml(d.application)}</span>
               <span class="text-xs text-slate-500 font-mono">[${escapeHtml(d.environment)}]</span>
               ${getDismissalActionBadge(d.dismissal_action)}
@@ -1005,33 +1023,58 @@
       }
     }
 
+    function renderAiChat() {
+      const messages = document.getElementById('aiChatMessages');
+      messages.innerHTML = aiHistory.map(message => `
+        <div class="flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[90%] rounded-lg px-3 py-2 text-xs whitespace-pre-wrap ${message.role === 'user' ? 'bg-indigo-600/80 text-white' : 'bg-slate-900/80 border border-slate-700 text-slate-300'}">
+            <div class="text-[10px] uppercase tracking-wide ${message.role === 'user' ? 'text-indigo-200' : 'text-indigo-400'} mb-1">${message.role === 'user' ? 'You' : 'Copilot'}</div>
+            ${escapeHtml(message.content)}
+          </div>
+        </div>
+      `).join('');
+      messages.scrollTop = messages.scrollHeight;
+    }
+
+    function activateAiChat() {
+      document.getElementById('aiPromptState').classList.add('hidden');
+      document.getElementById('aiChatState').classList.remove('hidden');
+      renderAiChat();
+      document.getElementById('aiChatInput').focus();
+    }
+
     // Ask AI
-    async function askAI() {
-      const query = document.getElementById('aiQueryInput').value.trim();
+    async function askAI(isFollowUp = false) {
+      const input = document.getElementById(isFollowUp ? 'aiChatInput' : 'aiQueryInput');
+      const query = input.value.trim();
       if (!query) return;
       
-      const btn = document.getElementById('btnAskAI');
-      const box = document.getElementById('aiResponseBox');
-      const text = document.getElementById('aiResponseText');
+      const btn = document.getElementById(isFollowUp ? 'btnChatAsk' : 'btnAskAI');
+      const previousHistory = [...aiHistory];
+      aiHistory.push({role: 'user', content: query});
+      input.value = '';
+      activateAiChat();
       
       btn.disabled = true;
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Reasoning...';
-      box.classList.remove('hidden');
-      text.innerText = 'Analyzing active observations, anomalies, and historical embeddings...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+      renderAiChat();
 
       try {
         const res = await fetch('/api/ask-ai', {
           method: 'POST',
           headers: {'Content-Type': 'application/json'},
-          body: JSON.stringify({query: query})
+          body: JSON.stringify({query: query, history: previousHistory})
         });
+        if (!res.ok) throw new Error(`Request failed (${res.status})`);
         const data = await res.json();
-        text.innerText = data.answer || 'No response returned.';
+        aiHistory.push({role: 'assistant', content: data.answer || 'No response returned.'});
       } catch(e) {
-        text.innerText = 'Error querying Ask AI assistant: ' + e;
+        aiHistory.push({role: 'assistant', content: 'Error querying Ask AI assistant: ' + e.message});
       } finally {
+        localStorage.setItem('logscope-ai-chat', JSON.stringify(aiHistory));
+        renderAiChat();
         btn.disabled = false;
-        btn.innerHTML = '<i class="fa-solid fa-paper-plane text-xs"></i> Ask Copilot';
+        btn.innerHTML = isFollowUp ? '<i class="fa-solid fa-paper-plane"></i>' : '<i class="fa-solid fa-paper-plane text-xs"></i> Ask Copilot';
       }
     }
 
@@ -1046,6 +1089,13 @@
     }
 
     // Refresh all endpoints
+    function setRefreshInterval(value) {
+      const interval = Number(value);
+      if (refreshTimer) clearInterval(refreshTimer);
+      refreshTimer = interval > 0 ? setInterval(refreshData, interval) : null;
+      localStorage.setItem('logscope-refresh-interval', String(interval));
+    }
+
     async function refreshData() {
       try {
         const [telRes, actRes, disRes, tplRes] = await Promise.all([
@@ -1122,11 +1172,15 @@
 
     // Init on load
     window.addEventListener('DOMContentLoaded', () => {
+      const savedInterval = localStorage.getItem('logscope-refresh-interval');
+      if (savedInterval !== null) {
+        document.getElementById('refreshIntervalSelect').value = savedInterval;
+      }
       loadSources();
       refreshData();
       initEventStream();
-      setInterval(refreshData, 10000); // Background refresh backup
-      setInterval(loadTimelineData, 30000);
+      setRefreshInterval(document.getElementById('refreshIntervalSelect').value);
+      if (aiHistory.length) activateAiChat();
     });
   </script>
 </body>
