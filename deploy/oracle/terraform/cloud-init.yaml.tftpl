@@ -32,7 +32,6 @@ write_files:
     content: |
       ${deploy_user} ALL=(root) NOPASSWD: /opt/logscope/deploy/oracle/bootstrap-secrets.sh
   - path: /home/${deploy_user}/.ssh/authorized_keys
-    owner: ${deploy_user}:${deploy_user}
     permissions: '0600'
     content: |
       ${ssh_public_key}
@@ -40,6 +39,7 @@ write_files:
 runcmd:
   - systemctl enable --now docker
   - install -d -m 0700 -o ${deploy_user} -g ${deploy_user} /home/${deploy_user}/.ssh
+  - chown ${deploy_user}:${deploy_user} /home/${deploy_user}/.ssh/authorized_keys
   - git clone ${repository_url} /opt/logscope
   - chown -R ${deploy_user}:${deploy_user} /opt/logscope
   - python3 -m venv /opt/oci-cli
