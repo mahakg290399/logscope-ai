@@ -6,7 +6,7 @@ import sqlite3
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
-from typing import List, Optional, Dict, Any, Tuple
+from typing import AsyncGenerator, List, Optional, Dict, Any, Tuple
 import aiosqlite
 from logscope.models import (
     SourceConfig, TemplateRecord, TemplateBucket, AnomalyRecord,
