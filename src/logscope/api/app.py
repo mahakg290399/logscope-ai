@@ -260,4 +260,12 @@ def create_app(
             return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
         return HTMLResponse("<h1>LogScope AI</h1><p>Dashboard UI not found.</p>")
 
+    # Serve technical whitepaper page (linked beside the v2.0 badge)
+    @app.get("/whitepaper", response_class=HTMLResponse)
+    async def serve_whitepaper():
+        html_file = Path(__file__).parent.parent / "web" / "whitepaper.html"
+        if html_file.exists():
+            return HTMLResponse(content=html_file.read_text(encoding="utf-8"))
+        return HTMLResponse("<h1>LogScope AI</h1><p>Whitepaper not found.</p>")
+
     return app

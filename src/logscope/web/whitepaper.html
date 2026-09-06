@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LogScope AI v2.0 — Technical Whitepaper</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(900px 480px at 12% -6%, rgba(139, 92, 246, 0.22), transparent 60%),
+        radial-gradient(820px 460px at 88% 4%, rgba(34, 211, 238, 0.14), transparent 60%),
+        radial-gradient(700px 500px at 50% 110%, rgba(244, 114, 182, 0.10), transparent 60%);
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    .glass { background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(12px); border: 1px solid rgba(148, 163, 184, 0.14); }
+    .prose-paper h2 { color: #fff; font-weight: 700; font-size: 1.35rem; margin: 2.2rem 0 0.8rem; letter-spacing: -0.01em; }
+    .prose-paper h3 { color: #e2e8f0; font-weight: 600; font-size: 1.05rem; margin: 1.4rem 0 0.5rem; }
+    .prose-paper p, .prose-paper li { color: #cbd5e1; font-size: 0.9rem; line-height: 1.7; }
+    .prose-paper ul { list-style: disc; padding-left: 1.4rem; margin: 0.5rem 0; }
+    .prose-paper ol { list-style: decimal; padding-left: 1.4rem; margin: 0.5rem 0; }
+    .prose-paper code { background: rgba(148,163,184,.12); padding: 0.1rem 0.35rem; border-radius: 0.3rem; font-size: 0.8rem; color: #a5f3fc; }
+    .prose-paper table { width: 100%; font-size: 0.82rem; margin: 0.8rem 0; border-collapse: collapse; }
+    .prose-paper th { text-align: left; color: #93c5fd; font-weight: 600; padding: 0.5rem 0.6rem; border-bottom: 1px solid rgba(148,163,184,.2); }
+    .prose-paper td { padding: 0.5rem 0.6rem; border-bottom: 1px solid rgba(148,163,184,.1); color: #cbd5e1; vertical-align: top; }
+    .kicker { font-size: 0.72rem; letter-spacing: 0.18em; text-transform: uppercase; color: #22d3ee; font-weight: 700; }
+    .fig { border: 1px dashed rgba(148,163,184,.3); border-radius: 0.75rem; padding: 1.5rem; text-align: center; color: #64748b; font-size: 0.8rem; margin: 1rem 0; background: rgba(2,6,23,.5); }
+    .open-q { border-left: 3px solid #f59e0b; background: rgba(245,158,11,.07); padding: 0.7rem 1rem; border-radius: 0 0.5rem 0.5rem 0; margin: 0.8rem 0; }
+    .open-q p { color: #fde68a !important; font-size: 0.83rem !important; }
+  </style>
+</head>
+<body class="min-h-screen antialiased">
+  <header class="border-b border-slate-800/80 bg-slate-950/70 sticky top-0 z-50 backdrop-blur">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-violet-500/40">
+          <i class="fa-solid fa-wave-pulse text-white text-lg"></i>
+        </div>
+        <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-cyan-100 to-violet-300 bg-clip-text text-transparent">LogScope AI</span>
+        <span class="text-xs px-2 py-0.5 ml-1 rounded-md bg-violet-950/80 text-violet-300 border border-violet-700/60 font-mono">v2.0</span>
+      </a>
+      <a href="/" class="text-xs px-3 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1.5">
+        <i class="fa-solid fa-arrow-left"></i> Live dashboard
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 sm:px-6 py-10 prose-paper">
+    <p class="kicker">Technical whitepaper</p>
+    <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mt-2">LogScope AI <span class="bg-gradient-to-r from-cyan-300 to-violet-400 bg-clip-text text-transparent">v2.0</span></h1>
+    <p class="mt-2 text-slate-400 text-sm">SRE log aggregation, deterministic anomaly detection &amp; AI incident triage &mdash; problem, architecture, tooling, dashboard guide and production path. Last updated 2026-09-06. Live system: <code>logscope.freengineer.me</code>.</p>
+
+    <h2>1. The problem we solve</h2>
+    <p>Modern services emit thousands of log lines per second across multiple files, hosts and formats. Engineers face four pains:</p>
+    <ol>
+      <li><strong class="text-slate-100">Volume without signal</strong> &mdash; repetitive lines bury the one new error that matters.</li>
+      <li><strong class="text-slate-100">Slow correlation</strong> &mdash; connecting a spike in service A to a timeout in service B is manual grep work.</li>
+      <li><strong class="text-slate-100">Alert fatigue</strong> &mdash; threshold alerts fire on noise; real incidents hide inside them.</li>
+      <li><strong class="text-slate-100">Unsafe AI shortcuts</strong> &mdash; pasting raw logs into an LLM leaks passwords, tokens, emails and customer IDs.</li>
+    </ol>
+    <p>LogScope treats logs as an <em>application heartbeat</em>: compress repetition into templates, watch the pulse for arrhythmia with deterministic rules, and call the LLM only as a triage copilot over sanitized, bounded evidence.</p>
+    <div class="fig"><i class="fa-solid fa-image text-2xl mb-2 block"></i>FIGURE 1 &mdash; The log-volume problem. Generate with prompt P1 in &sect;8, or screenshot the live timeline chart.</div>
+
+    <h2>2. Design principles</h2>
+    <ul>
+      <li><strong class="text-slate-100">Sanitize first, stream second.</strong> Raw lines never cross the Kafka boundary and never enter an AI prompt. Redaction + client-ID hashing happen in the collector.</li>
+      <li><strong class="text-slate-100">Deterministic detection before AI.</strong> New-template, frequency-spike (z-score &ge; 3.0) and error-burst rules fire on math; the model only judges <em>whether it deserves investigation</em>.</li>
+      <li><strong class="text-slate-100">Bounded everything.</strong> Max 5 redacted samples per template per 5-minute bucket; bounded queues that drop oldest-first with visible counters instead of blocking.</li>
+      <li><strong class="text-slate-100">Honest UI.</strong> Dropped events, consumer lag, AI failures and data-loss warnings are first-class dashboard citizens &mdash; the system never claims complete analysis when data was dropped.</li>
+    </ul>
+
+    <h2>3. Architecture</h2>
+    <div class="glass rounded-xl p-4 overflow-x-auto">
+    <svg viewBox="0 0 960 300" class="w-full min-w-[640px]" role="img" aria-label="LogScope pipeline diagram">
+      <defs>
+        <marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="none" stroke="#67e8f9" stroke-width="1.5"/></marker>
+        <linearGradient id="box" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#1e1b4b"/><stop offset="1" stop-color="#0c142e"/></linearGradient>
+      </defs>
+      <g font-family="monospace" font-size="11" text-anchor="middle">
+        <rect x="8" y="60" width="118" height="64" rx="10" fill="url(#box)" stroke="#8b5cf6"/>
+        <text x="67" y="88" fill="#ede9fe">File tailer</text><text x="67" y="104" fill="#a78bfa">+ multiline</text>
+        <rect x="146" y="60" width="118" height="64" rx="10" fill="url(#box)" stroke="#8b5cf6"/>
+        <text x="205" y="88" fill="#ede9fe">Redactor</text><text x="205" y="104" fill="#a78bfa">PII / secrets</text>
+        <rect x="284" y="60" width="118" height="64" rx="10" fill="url(#box)" stroke="#8b5cf6"/>
+        <text x="343" y="88" fill="#ede9fe">Drain3</text><text x="343" y="104" fill="#a78bfa">templates</text>
+        <rect x="422" y="60" width="118" height="64" rx="10" fill="#0b2b33" stroke="#22d3ee"/>
+        <text x="481" y="88" fill="#cffafe">Kafka KRaft</text><text x="481" y="104" fill="#67e8f9">sanitized only</text>
+        <rect x="560" y="60" width="118" height="64" rx="10" fill="url(#box)" stroke="#8b5cf6"/>
+        <text x="619" y="88" fill="#ede9fe">5-min buckets</text><text x="619" y="104" fill="#a78bfa">+ detectors</text>
+        <rect x="698" y="20" width="120" height="56" rx="10" fill="#0f2a1d" stroke="#34d399"/>
+        <text x="758" y="42" fill="#d1fae5">SQLite WAL</text><text x="758" y="58" fill="#6ee7b7">6-month store</text>
+        <rect x="698" y="100" width="120" height="56" rx="10" fill="#0f2a1d" stroke="#34d399"/>
+        <text x="758" y="122" fill="#d1fae5">Vector index</text><text x="758" y="138" fill="#6ee7b7">similarity</text>
+        <rect x="838" y="60" width="114" height="64" rx="10" fill="#2b1030" stroke="#f472b6"/>
+        <text x="895" y="88" fill="#fce7f3">AI worker</text><text x="895" y="104" fill="#f9a8d4">Sev-0..4</text>
+      </g>
+      <g stroke="#67e8f9" stroke-width="1.5" marker-end="url(#arr)">
+        <line x1="126" y1="92" x2="144" y2="92"/><line x1="264" y1="92" x2="282" y2="92"/>
+        <line x1="402" y1="92" x2="420" y2="92"/><line x1="540" y1="92" x2="558" y2="92"/>
+        <line x1="678" y1="80" x2="696" y2="52"/><line x1="678" y1="104" x2="696" y2="124"/>
+        <line x1="758" y1="48" x2="880" y2="70" stroke="#6ee7b7"/><line x1="758" y1="128" x2="880" y2="100" stroke="#6ee7b7"/>
+      </g>
+      <line x1="8" y1="150" x2="540" y2="150" stroke="#f43f5e" stroke-dasharray="6 4" stroke-width="1.5"/>
+      <text x="8" y="166" font-family="monospace" font-size="11" fill="#fda4af">sanitization boundary: raw logs never pass this line</text>
+      <g font-family="monospace" font-size="11" text-anchor="middle">
+        <rect x="284" y="200" width="384" height="64" rx="10" fill="url(#box)" stroke="#64748b"/>
+        <text x="476" y="226" fill="#e2e8f0">FastAPI + SSE + dashboard</text>
+        <text x="476" y="244" fill="#94a3b8">KPIs &middot; triage feed &middot; Ask copilot &middot; whitepaper</text>
+      </g>
+      <g stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)">
+        <line x1="758" y1="156" x2="758" y2="198" stroke="#6ee7b7"/><line x1="895" y1="124" x2="760" y2="198" stroke="#f9a8d4"/>
+      </g>
+    </svg>
+    </div>
+    <h3>Retention</h3>
+    <table>
+      <tr><th>Data</th><th>Kept</th><th>Where</th></tr>
+      <tr><td>Kafka events (sanitized)</td><td>24 hours</td><td>KRaft topics</td></tr>
+      <tr><td>Raw &amp; redacted samples</td><td>24 hours, auto-deleted</td><td>SQLite</td></tr>
+      <tr><td>5-minute aggregates, anomalies, AI analyses, embeddings</td><td>6 months</td><td>SQLite WAL + vector index</td></tr>
+    </table>
+
+    <h2>4. Tools we use</h2>
+    <table>
+      <tr><th>Layer</th><th>Tool</th><th>Why</th></tr>
+      <tr><td>API + dashboard</td><td>FastAPI, SSE, Tailwind, Chart.js</td><td>Real-time triage UI with zero build step</td></tr>
+      <tr><td>Template mining</td><td>Drain3 (per app+env)</td><td>Online clustering of repetitive lines</td></tr>
+      <tr><td>Streaming</td><td>Apache Kafka KRaft</td><td>Buffering, replay, consumer isolation; PRD-mandated boundary</td></tr>
+      <tr><td>Storage</td><td>SQLite WAL + numpy vector index</td><td>Single-file ops, concurrent readers, similarity search</td></tr>
+      <tr><td>AI triage</td><td>NVIDIA NIM / OpenAI / Gemini (fallback chain) + heuristic offline mode</td><td>Structured Sev-0..Sev-4 verdicts, prompt-injection guarded</td></tr>
+      <tr><td>Edge + deploy</td><td>Caddy, Docker Compose, Terraform, GitHub Actions</td><td>HTTPS, reproducible stack, IaC, CI/CD</td></tr>
+      <tr><td>Secrets</td><td>OCI Vault + instance principals</td><td>Keys never live in git, images or CI</td></tr>
+      <tr><td>Ingestion options</td><td>Fluent Bit, Kafka raw topic, CloudWatch Lambda</td><td>Node agents, direct streams, serverless forwarders</td></tr>
+    </table>
+
+    <h2>5. Dashboard guide &mdash; every box on screen</h2>
+    <h3>Navbar: Live Stream + v2.0</h3>
+    <p>Pulsing <code>Live Stream</code> pill reflects SSE connectivity (green = connected). The <code>v2.0</code> badge marks the release; this whitepaper link sits beside it. The <code>WAL SQLite &bull; Sanitized Kafka</code> note states the storage/streaming posture.</p>
+    <h3>Warning banner</h3>
+    <p>Appears only when something needs attention: backpressure drops, Kafka lag, or AI provider errors with retry state. Hidden when healthy &mdash; its absence is itself a signal.</p>
+    <h3>KPI cards</h3>
+    <ul>
+      <li><strong class="text-slate-100">Ingestion Rate</strong> &mdash; lines/sec across all tailers, plus lifetime total. Validates the ~1,000 LPS target.</li>
+      <li><strong class="text-slate-100">Buffer Lag &amp; Drops</strong> &mdash; queued observations and cumulative dropped count. Any non-zero drops mean triage is approximate.</li>
+      <li><strong class="text-slate-100">Active Anomalies</strong> &mdash; triaged incidents in the current window.</li>
+      <li><strong class="text-slate-100">Drain3 Clusters</strong> &mdash; unique templates mined; click to open the template browser, with active source count below.</li>
+    </ul>
+    <h3>5-Minute Ingestion Volume &amp; Anomaly Timeline</h3>
+    <p>Chart.js chart of bucketed observation volume (cyan) overlaid with error spikes (rose), fed by <code>/api/buckets/timeline</code>. Refresh icon reloads on demand; it answers &ldquo;did anything just change?&rdquo; at a glance.</p>
+    <div class="fig"><i class="fa-solid fa-image text-2xl mb-2 block"></i>FIGURE 2 &mdash; Timeline chart. Generate with prompt P2 in &sect;8, or screenshot the live chart.</div>
+    <h3>Active Anomalies + filters</h3>
+    <p>Each card carries an <code>INC</code> + 7-digit incident number, severity (Sev-0 critical &hellip; Sev-4 info), confidence (very-low&hellip;very-high), AI summary, evidence (template IDs, counts, source path/line), possible causes and recommended actions. The auto-refresh dropdown (5s/10s/30s/60s/Off) plus manual Refresh control polling; severity/application/environment/source filters narrow the feed. Empty state (&ldquo;All Services Operating Normally&rdquo;) confirms detectors ran and found nothing &mdash; distinct from a disconnected stream.</p>
+    <h3>Dismissed Anomalies Archive</h3>
+    <p>Collapsible history with outcome badges: green Resolved, amber False Alarm, slate Transient. Nothing is deleted &mdash; every verdict stays queryable for future AI context.</p>
+    <h3>Ask SRE Copilot</h3>
+    <p>Textarea that morphs into a persistent chat thread on first answer, with follow-up input. Queries embed against historical templates/incidents and answer with evidence references &mdash; or explicitly state when evidence is insufficient.</p>
+    <h3>Monitored Sources</h3>
+    <p>Each configured source with application, environment, path and heartbeat status. <code>Read-Only</code> guarantees the collector never writes to log directories.</p>
+    <h3>Incident Action &amp; Resolution modal</h3>
+    <p>Three outcomes: <strong class="text-emerald-300">Resolved</strong> (fix notes indexed into vector memory for future triage), <strong class="text-amber-300">False Alarm</strong> (expected/harmless, kept out of resolution memory), <strong class="text-slate-200">Transient</strong> (blip, quick dismiss).</p>
+    <h3>Mined Templates + drill-down modal</h3>
+    <p>Template browser; per-template drill-down shows the pattern, founding sample message, 5-minute bucket rollup history table and bounded sanitized evidence samples &mdash; the full audit trail from pulse to verdict.</p>
+
+    <h2>6. Production path</h2>
+    <h3>Running today (OCI Always Free)</h3>
+    <p>Single Ampere A1 VM (2 OCPU / 12 GB, Terraform-managed, reserved IP) running Kafka + app + demo workload + Caddy for <code>https://logscope.freengineer.me</code>. Secrets in OCI Vault via instance principal; deploys via GitHub Actions (<code>infra.yml</code> for infrastructure, <code>cd.yml</code> for code). $0/month inside Always Free limits.</p>
+    <h3>To production-grade</h3>
+    <table>
+      <tr><th>Topic</th><th>Direction</th><th>Status</th></tr>
+      <tr><td>Authentication</td><td>SSO (GitHub/Google) in front of dashboard; single-user mode ends</td><td>Open &mdash; provider choice pending</td></tr>
+      <tr><td>Availability</td><td>Second VM / managed Kafka; SQLite &rarr; Postgres when write contention bites</td><td>Open &mdash; trigger thresholds pending</td></tr>
+      <tr><td>Alerting</td><td>Sev-0/Sev-1 &rarr; Slack + PagerDuty webhooks from AI worker</td><td>Open &mdash; channels pending</td></tr>
+      <tr><td>Backups</td><td>OCI volume backups + SQLite dumps to Object Storage bucket</td><td>Planned</td></tr>
+      <tr><td>Real log sources</td><td>Fluent Bit DaemonSet / Kafka raw topic / CloudWatch forwarder (all built); steady feed choice pending</td><td>Open &mdash; source decision pending</td></tr>
+      <tr><td>Privacy hardening</td><td>HMAC (keyed) client pseudonymization replacing POC SHA-256</td><td>Planned</td></tr>
+      <tr><td>Cost control</td><td>Stay in Always Free envelope; egress + retention monitors before any paid step</td><td>Guardrail</td></tr>
+    </table>
+    <div class="open-q"><p><i class="fa-solid fa-circle-question mr-1"></i>Open production questions for review: SSO provider? Alert channels? Second-VM trigger? Which steady log source? Answers get recorded in <code>docs/DECISIONS.md</code>.</p></div>
+
+    <h2>7. Verification snapshot</h2>
+    <p>34/34 tests passing; ~1,000+ lines/sec sustained with zero drops (benchmark); <code>/api/health</code> 200 in production. Acceptance criteria trace to <code>PRD.md</code> &sect;20.</p>
+
+    <h2>8. Image generation prompts</h2>
+    <p>Use these with an image-capable model to produce the whitepaper figures (dark SRE-console style, cyan/violet on deep navy):</p>
+    <ul>
+      <li><strong class="text-slate-100">P1 &mdash; problem:</strong> &ldquo;Dark operations-center illustration: engineer silhouette before a wall of monitors drowning in green log text, one red error line glowing; cinematic, navy background, cyan and violet accents, no readable text.&rdquo;</li>
+      <li><strong class="text-slate-100">P2 &mdash; dashboard mock:</strong> &ldquo;Dark-mode SRE dashboard UI mockup: KPI cards row, cyan area chart with red spike overlay, incident cards with severity badges, AI chat panel; sleek glassmorphism, deep navy, cyan/violet glow, 16:9.&rdquo;</li>
+      <li><strong class="text-slate-100">P3 &mdash; pipeline:</strong> &ldquo;Horizontal data-pipeline diagram, dark theme: file icons &rarr; shield (sanitize) &rarr; clustered templates &rarr; Kafka stream &rarr; chart buckets &rarr; robot analyst &rarr; dashboard; glowing cyan connectors, violet nodes.&rdquo;</li>
+      <li><strong class="text-slate-100">P4 &mdash; deployment:</strong> &ldquo;Cloud deployment topology on dark canvas: GitHub box pushing to Oracle Cloud VM box containing Kafka, app, Caddy containers, vault icon beside it, HTTPS arrow to a browser showing a dashboard; minimal, cyan/violet.&rdquo;</li>
+      <li><strong class="text-slate-100">P5 &mdash; triage:</strong> &ldquo;Close-up of AI incident triage card UI: severity badge Sev-1, confidence meter, evidence list, recommended actions; dark glass card, red/amber accents, ultra clean.&rdquo;</li>
+    </ul>
+
+    <footer class="mt-12 pt-6 border-t border-slate-800/80 text-xs text-slate-500 flex items-center justify-between">
+      <span>LogScope AI v2.0 whitepaper &mdash; generated from the live codebase.</span>
+      <a href="/" class="text-cyan-300 hover:text-cyan-200">Back to dashboard &rarr;</a>
+    </footer>
+  </main>
+</body>
+</html>

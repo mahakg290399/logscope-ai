@@ -44,6 +44,13 @@ async def test_api_endpoints(test_settings: Settings):
         assert "LogScope AI" in res_dashboard.text
         assert "timelineChart" in res_dashboard.text
         assert "templateDetailModal" in res_dashboard.text
+        assert "/whitepaper" in res_dashboard.text
+
+        # 6b. Whitepaper HTML serving
+        res_wp = await client.get("/whitepaper")
+        assert res_wp.status_code == 200
+        assert "whitepaper" in res_wp.text.lower()
+        assert "LogScope AI" in res_wp.text
 
         # 7. HTTP Log Ingestion (Cloud forwarders / Fluent Bit / Vector)
         res_ingest = await client.post(

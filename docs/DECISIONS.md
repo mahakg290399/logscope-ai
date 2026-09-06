@@ -35,3 +35,7 @@ The full stack (Kafka KRaft + app + Caddy + demo-app, ~1.5–2.5 GB RAM) only fi
 ## ADR-009 — Pull-based GitHub Actions deploy, secrets stay on the VM
 
 CI (`ci.yml`) runs pytest and compose validation on standard runners — free and unlimited on the public repo. CD (`cd.yml`) SSHs into the VM and runs `git pull --ff-only` plus a native ARM `docker compose up -d --build`; no cross-arch image build, no container registry. LLM API keys never enter GitHub Secrets: the VM refreshes them from OCI Secret Management via instance principal (`bootstrap-secrets.sh`). GitHub holds only `OCI_HOST`, `OCI_USER`, `OCI_SSH_KEY`.
+
+## ADR-010 — Whitepaper is an in-app page, UI stays data-identical
+
+The technical whitepaper ships as `src/logscope/web/whitepaper.html` served at `/whitepaper` (single source, readable in repo and in prod), linked beside the `v2.0` badge. Dashboard refreshes may remap palette/surfaces freely but must preserve every element ID, endpoint and data contract the tests assert.

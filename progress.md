@@ -189,3 +189,21 @@
 - **Verification**:
   - Full test suite passing: **34/34 tests pass** (`python -m pytest`).
   - Docker Compose configuration validated: **`docker compose --profile collector config` passed cleanly**.
+
+## Session 12: Oracle Deploy Automation, Vault, Domain & Dashboard Upgrades
+- **Date**: 2026-09-06 (Codex-led, after Antigravity session crashed mid-deploy)
+- **Infrastructure as code**: new manual VM steps replaced by Terraform in [`deploy/oracle/terraform/`](file:///d:/code/log_tool/deploy/oracle/terraform/) (`main.tf`, `variables.tf`, `outputs.tf`, `cloud-init.yaml.tftpl`) — VCN, gateway, route table, security list, subnet, Ampere A1 VM, cloud-init (Docker, OCI CLI, repo clone at `/opt/logscope`, deploy user + SSH), reserved public IP. Remote state in OCI Object Storage bucket.
+- **GitHub automation**: new [`.github/workflows/infra.yml`](file:///d:/code/log_tool/.github/workflows/infra.yml) (`workflow_dispatch` apply/destroy, `production` environment, concurrency-guarded); [`cd.yml`](file:///d:/code/log_tool/.github/workflows/cd.yml) now takes deployment domain from the GitHub environment.
+- **Secrets**: OCI Vault + master key created; OpenAI/Gemini/NVIDIA secrets stored via [`deploy/oracle/create-vault-secrets.sh`](file:///d:/code/log_tool/deploy/oracle/create-vault-secrets.sh); repo secrets moved from repo-level to `production` environment; VM refreshes keys at deploy time via instance principal (`bootstrap-secrets.sh`, now executable + deploy-user readable, privileged runtime config). Local values reference file kept uncommitted.
+- **Import without downtime**: 6 live resources (VCN, gateway, route table, security list, subnet, VM) imported into Terraform state with a lifecycle guard so bootstrap-metadata changes never replace the running VM.
+- **Fix batch**: prod app startup + domain injection, deploy-user home ownership, cloud-init SSH setup, CI database-type import.
+- **Dashboard**: Ask-AI renders inline as chat with history, `INC` + 7-digit incident numbers, configurable refresh-rate dropdown, version badge simplified to `v2.0`.
+- **Domain**: `freengineer.me` (Spaceship) → `logscope.freengineer.me` subdomain (after fixing a `logsscope` DNS typo).
+- **Verification**: `https://logscope.freengineer.me/api/health` returns **200** (checked 2026-09-06).
+
+## Session 13: In-App Whitepaper, v2.0 Link & Dashboard Refresh
+- **Date**: 2026-09-06
+- **Whitepaper**: new [`src/logscope/web/whitepaper.html`](file:///d:/code/log_tool/src/logscope/web/whitepaper.html) served at `/whitepaper` (new FastAPI route in `api/app.py`) — problem, design principles, hand-authored SVG pipeline diagram with sanitization boundary, retention table, tools matrix, per-panel dashboard guide, production path with open questions flagged, verification snapshot, and 5 image-generation prompts (P1–P5) for LLM illustration.
+- **Discovery**: `Whitepaper` badge link placed directly beside the `v2.0` badge in the navbar; both link back and forth (`/` ↔ `/whitepaper`).
+- **UI modernization** (same panels, same data): electric-violet `indigo` remap + deepened `slate` surfaces via `tailwind.config`, aurora-gradient body, glass cards with glow hover, gradient logo block, timeline volume line cyan (`#22d3ee`).
+- **Verification**: 34/34 tests pass (added `/whitepaper` 200 + content assertions to `tests/test_api.py`); local + Oracle `docker compose config` clean.

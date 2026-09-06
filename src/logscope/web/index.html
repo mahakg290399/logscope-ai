@@ -13,21 +13,32 @@
       theme: {
         extend: {
           colors: {
-            brand: { 50: '#eef2ff', 500: '#6366f1', 600: '#4f46e5', 700: '#4338ca' },
-            sev0: '#ef4444',
-            sev1: '#f97316',
-            sev2: '#f59e0b',
-            sev3: '#3b82f6',
-            sev4: '#64748b'
+            brand: { 50: '#f5f0ff', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9' },
+            // Electric-violet remap: every indigo-* class renders vivid, not pale.
+            indigo: { 200: '#ddd6fe', 300: '#c4b5fd', 400: '#a78bfa', 500: '#8b5cf6', 600: '#7c3aed', 700: '#6d28d9', 800: '#5b21b6', 900: '#4c1d95', 950: '#2e1065' },
+            // Deepened surfaces: slate-700+ go near-black blue for contrast.
+            slate: { 100: '#e2e8f0', 200: '#cbd5e1', 300: '#a8b6cc', 400: '#7d8aa5', 500: '#64748b', 700: '#2b3a55', 800: '#16213a', 900: '#0b1226', 950: '#060a18' },
+            sev0: '#f87171',
+            sev1: '#fb923c',
+            sev2: '#fbbf24',
+            sev3: '#38bdf8',
+            sev4: '#7d8aa5'
           }
         }
       }
     }
   </script>
   <style>
-    body { background-color: #0f172a; color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-    .glass-card { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08); }
-    .glass-card:hover { border-color: rgba(255, 255, 255, 0.15); }
+    body {
+      background-color: #070b1a;
+      background-image:
+        radial-gradient(900px 480px at 12% -6%, rgba(139, 92, 246, 0.22), transparent 60%),
+        radial-gradient(820px 460px at 88% 4%, rgba(34, 211, 238, 0.13), transparent 60%),
+        radial-gradient(700px 500px at 50% 110%, rgba(244, 114, 182, 0.09), transparent 60%);
+      background-attachment: fixed;
+      color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    .glass-card { background: rgba(11, 18, 38, 0.78); backdrop-filter: blur(14px); border: 1px solid rgba(148, 163, 184, 0.14); box-shadow: 0 8px 28px rgba(2, 6, 23, 0.45); }
+    .glass-card:hover { border-color: rgba(34, 211, 238, 0.35); box-shadow: 0 8px 32px rgba(124, 58, 237, 0.25); }
     .pulse-dot { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
     @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
   </style>
@@ -38,12 +49,13 @@
   <header class="border-b border-slate-800 bg-slate-900/80 sticky top-0 z-50 backdrop-blur">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       <div class="flex items-center gap-3">
-        <div class="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-violet-500/40">
           <i class="fa-solid fa-wave-pulse text-white text-lg"></i>
         </div>
         <div>
-          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-200 to-indigo-300 bg-clip-text text-transparent">LogScope AI</span>
-          <span class="text-xs px-2 py-0.5 ml-2 rounded bg-indigo-950 text-indigo-400 border border-indigo-800 font-mono">v2.0</span>
+          <span class="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-cyan-100 to-violet-300 bg-clip-text text-transparent">LogScope AI</span>
+          <span class="text-xs px-2 py-0.5 ml-2 rounded-md bg-violet-950/80 text-violet-300 border border-violet-700/60 font-mono">v2.0</span>
+          <a href="/whitepaper" class="text-xs px-2 py-0.5 ml-1.5 rounded-md bg-cyan-950/60 text-cyan-300 border border-cyan-800/70 hover:bg-cyan-900/60 hover:text-cyan-200 transition font-medium"><i class="fa-solid fa-book-open text-[10px] mr-1"></i>Whitepaper</a>
         </div>
       </div>
 
@@ -887,12 +899,12 @@
             {
               label: 'Total Observations',
               data: totalCounts.length ? totalCounts : [0],
-              borderColor: '#6366f1',
+              borderColor: '#22d3ee',
               backgroundColor: 'rgba(99, 102, 241, 0.15)',
               borderWidth: 2,
               fill: true,
               tension: 0.35,
-              pointBackgroundColor: '#818cf8',
+              pointBackgroundColor: '#67e8f9',
               pointRadius: 3,
             },
             {
