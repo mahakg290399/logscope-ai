@@ -29,6 +29,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
+    env:
+      LOGSCOPE_DOMAIN: ${{ secrets.LOGSCOPE_DOMAIN }}
     steps:
       - name: Deploy to Oracle VM over SSH
         uses: appleboy/ssh-action@v1
@@ -36,13 +38,14 @@ jobs:
           host: ${{ secrets.OCI_HOST }}
           username: ${{ secrets.OCI_USER }}
           key: ${{ secrets.OCI_SSH_KEY }}
+          envs: LOGSCOPE_DOMAIN
           script: |
             set -euo pipefail
             cd /opt/logscope
             git pull --ff-only
             cd deploy/oracle
             set -a; . /etc/logscope/oci-secrets.conf; set +a
-            : "${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN in /etc/logscope/oci-secrets.conf}"
+            : "${LOGSCOPE_DOMAIN:?Set LOGSCOPE_DOMAIN in the GitHub production environment}"
             sudo -n ./bootstrap-secrets.sh
             docker compose --env-file /opt/logscope/secrets/.env.runtime \
               -f docker-compose.production.yml up -d --build
