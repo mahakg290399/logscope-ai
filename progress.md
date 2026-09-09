@@ -214,3 +214,9 @@
 - Renamed §6 `Production path` → `Current deployment stack` (live OCI topology table: compute/network/stack/secrets/pipeline, $0 Always Free); future items moved to new §7 `Production hardening (open questions)`; verification → §8, prompts → §9.
 - Rewrote §9 prompts as theme-locked: every prompt appends a fixed style block (exact hexes `#070b1a`/`#22d3ee`/`#8b5cf6`/`#fb7185`/`#34d399`, glassmorphism, no readable sentences/logos/watermarks) plus aspect ratios and a screenshot-overlay tip.
 - **Verification**: 34/34 tests pass; pushed as `4bc6f35`, CD redeploying to `logscope.freengineer.me/whitepaper`.
+
+## Session 15: Whitepaper Photo Figures Live + Freengineer Cross-Links
+- **Date**: 2026-09-06/07
+- Wired `/img` static route (`StaticFiles` in `api/app.py`) with onerror fallbacks (photos primary, inline SVG fallback for Figs 1–2, auto-hide otherwise); committed 4 AI renders (`fig-problem/dashboard/triage/deploy.png`, ~1.1 MB) after verifying each serves 200 with correct MIME; renamed to meaningful names via `git mv`; dropped the hero slot by decision.
+- Cross-linked from the portfolio site: new `Projects in progress` (§04) section on `freengineer.me` with live-dashboard + whitepaper + source links (fun/professional copy variants in `script.js`), pushed as `441d43c` — verified live in production HTML.
+- **Verification**: 34/34 tests pass; `/whitepaper` 200; all 4 figures 200; freengineer.me serves the new section.
