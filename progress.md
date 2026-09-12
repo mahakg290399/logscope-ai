@@ -220,3 +220,9 @@
 - Wired `/img` static route (`StaticFiles` in `api/app.py`) with onerror fallbacks (photos primary, inline SVG fallback for Figs 1–2, auto-hide otherwise); committed 4 AI renders (`fig-problem/dashboard/triage/deploy.png`, ~1.1 MB) after verifying each serves 200 with correct MIME; renamed to meaningful names via `git mv`; dropped the hero slot by decision.
 - Cross-linked from the portfolio site: new `Projects in progress` (§04) section on `freengineer.me` with live-dashboard + whitepaper + source links (fun/professional copy variants in `script.js`), pushed as `441d43c` — verified live in production HTML.
 - **Verification**: 34/34 tests pass; `/whitepaper` 200; all 4 figures 200; freengineer.me serves the new section.
+
+## Session 16: Portfolio Showcase DOCX
+- **Date**: 2026-09-06/07
+- Added reusable generator [`scripts/build_showcase_docx.py`](file:///d:/code/log_tool/scripts/build_showcase_docx.py) (needs `python-docx`) producing `docs/LogScope-AI-Showcase.docx`: title, pitch, both live dashboard screenshots full-width with explanatory captions, triage walkthrough, engineering highlights, links, tech stack — ready to upload as a portfolio attachment.
+- Screenshots verified in advance (triage cards + KPI/timeline views); docx re-verified after build (23 paragraphs, 2 embedded images, 641 KB).
+- The `.docx` is a local upload artifact (regenerable, intentionally uncommitted); generator script is tracked.
